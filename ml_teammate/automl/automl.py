@@ -1,4 +1,3 @@
-
 class AutoML:
     def __init__(self):
         from ml_teammate.automl.controller import Controller
