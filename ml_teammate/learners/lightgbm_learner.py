@@ -1,4 +1,6 @@
 
+# ml_teammate/learners/lightgbm_learner.py
+
 from lightgbm import LGBMClassifier
 
 class LightGBMLearner:
@@ -10,3 +12,7 @@ class LightGBMLearner:
 
     def predict(self, X):
         return self.model.predict(X)
+
+# ✅ This is the expected function interface for the controller/api
+def get_lightgbm_learner(**config):
+    return LightGBMLearner(config)
