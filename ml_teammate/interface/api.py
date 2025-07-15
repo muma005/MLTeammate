@@ -4,7 +4,7 @@
 from ml_teammate.automl.controller import AutoMLController
 from ml_teammate.learners.lightgbm_learner import get_lightgbm_learner
 from ml_teammate.search.optuna_search import OptunaSearcher
-from ml_teammate.callbacks import LoggerCallback
+from ml_teammate.automl.callbacks import LoggerCallback
 from ml_teammate.experiments.mlflow_helper import MLflowHelper
 
 class MLTeammate:
