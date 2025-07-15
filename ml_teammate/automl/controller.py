@@ -1,4 +1,4 @@
-from utils.metrics import evaluate
+from ml_teammate.utils.metrics import evaluate
 import uuid
 
 class AutoMLController:
