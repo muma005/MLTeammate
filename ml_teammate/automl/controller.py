@@ -1,39 +1,53 @@
-# ml_teammate/automl/controller.py
-
+from utils.metrics import evaluate
 import uuid
-from ml_teammate.utils.metrics import evaluate
 
 class AutoMLController:
-    def __init__(self, learners, searcher, task="classification", n_trials=10):
-        self.learners = learners            # e.g. {"lightgbm": get_lightgbm_learner}
-        self.searcher = searcher            # instance of OptunaSearcher
+    def __init__(self, learners, searcher, config_space, task="classification", n_trials=10, logger_callback=None):
+        self.learners = learners
+        self.searcher = searcher
+        self.config_space = config_space
         self.task = task
         self.n_trials = n_trials
+        self.logger_callback = logger_callback
         self.best_score = None
         self.best_model = None
+        self.best_config = None
 
     def fit(self, X, y):
-        for i in range(self.n_trials):
-            tid = str(uuid.uuid4())
-            learner_name, learner_fn = next(iter(self.learners.items()))
-            config = self.searcher.suggest(tid, learner_name)
+        for trial_num in range(self.n_trials):
+            trial_id = str(uuid.uuid4())
+            learner_name = "lightgbm"  # ← you can change dynamically if supporting multiple learners
 
-            model = learner_fn(**config)
-            model.fit(X, y)
-            preds = model.predict(X)
-            score = evaluate(y, preds, task=self.task)
+            # Suggest a new configuration
+            config = self.searcher.suggest(trial_id, learner_name)
 
-            print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
+            # Initialize learner
+            learner_class = self.learners[learner_name]
+            learner = learner_class(config)
+            learner.fit(X, y)
 
-            self.searcher.report(tid, score)
+            # Evaluate
+            y_pred = learner.predict(X)
+            score = evaluate(y, y_pred, task=self.task)
 
-            if self.best_score is None or score < self.best_score:
+            # Report score to searcher
+            self.searcher.report(trial_id, score)
+
+            # Check if best
+            is_best = False
+            if (self.best_score is None) or (score < self.best_score):
                 self.best_score = score
-                self.best_model = model
+                self.best_model = learner
+                self.best_config = config
+                is_best = True
 
-        return self.best_model
+            # Call logger callback
+            if self.logger_callback:
+                self.logger_callback.on_trial_end(trial_id, config, score, is_best)
+
+            print(f"Trial {trial_num + 1}/{self.n_trials} — {learner_name} score={score:.4f}")
 
     def predict(self, X):
         if self.best_model is None:
-            raise RuntimeError("Must call fit() before predict()")
+            raise ValueError("You must call .fit() before .predict()")
         return self.best_model.predict(X)

@@ -1,31 +1,44 @@
 
 # ml_teammate/interface/api.py
 
-from ml_teammate.automl.controller import AutoMLController
 from ml_teammate.learners.lightgbm_learner import get_lightgbm_learner
 from ml_teammate.search.optuna_search import OptunaSearcher
+from ml_teammate.automl.controller import AutoMLController
+from ml_teammate.automl.callbacks import LoggerCallback
 
 class MLTeammate:
-    def __init__(self, task="classification", n_trials=10):
-        # Learner registry
-        self.learners = {"lightgbm": get_lightgbm_learner}
+    def __init__(self, task="classification", n_trials=5):
+        self.task = task
+        self.n_trials = n_trials
 
-        # Per-learner config spaces
-        config_spaces = {
+        # Prepare learner dictionary
+        self.learners = {
+            "lightgbm": get_lightgbm_learner
+        }
+
+        # Define config spaces per learner
+        self.config_spaces = {
             "lightgbm": {
-                "max_depth": {"type": "int", "bounds": [2, 8]},
-                "n_estimators": {"type": "int", "bounds": [10, 100]},
-                "learning_rate": {"type": "float", "bounds": [0.01, 0.3]},
+                "max_depth": (3, 8),
+                "learning_rate": (0.01, 0.3),
+                "n_estimators": (50, 300)
             }
         }
 
-        # Searcher and controller
-        self.searcher = OptunaSearcher(config_spaces)
+        # Create searcher
+        self.searcher = OptunaSearcher(self.config_spaces)
+
+        # Create logger callback
+        self.logger_callback = LoggerCallback()
+
+        # Create controller
         self.controller = AutoMLController(
             learners=self.learners,
             searcher=self.searcher,
-            task=task,
-            n_trials=n_trials
+            config_space=self.config_spaces,
+            task=self.task,
+            n_trials=self.n_trials,
+            logger_callback=self.logger_callback
         )
 
     def fit(self, X, y):
