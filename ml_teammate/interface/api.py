@@ -39,7 +39,7 @@ class MLTeammate:
         # Setup controller
         self.controller = AutoMLController(
             learners=self.learners,
-            searcher=self.searcher,
+            search=self.searcher,
             config_space=self.config_spaces,
             task=self.task,
             n_trials=self.n_trials,
