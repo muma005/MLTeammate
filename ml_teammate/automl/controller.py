@@ -1,55 +1,61 @@
-from ml_teammate.utils.metrics import evaluate
 import uuid
+from ml_teammate.utils.metrics import evaluate
 
 class AutoMLController:
-    def __init__(self, learners, search, config_space, task="classification", n_trials=10, callbacks=None, mlflow_helper=None):
+    def __init__(
+        self,
+        learners: dict,
+        searcher,
+        config_space: dict,
+        task: str = "classification",
+        n_trials: int = 10,
+        callbacks: list = None,
+        mlflow_helper = None
+    ):
         self.learners = learners
-        self.search = search
+        self.searcher = searcher
         self.config_space = config_space
         self.task = task
         self.n_trials = n_trials
-        self.callbacks = callbacks if callbacks is not None else []
-        self.mlflow_helper = mlflow_helper
+        self.callbacks = callbacks or []
+        self.mlflow = mlflow_helper
         self.best_score = None
         self.best_model = None
 
     def fit(self, X, y):
-        if self.mlflow_helper:
-            self.mlflow_helper.start_run()
+        if self.mlflow:
+            self.mlflow.start_run()
 
-        for trial_num in range(self.n_trials):
+        for i in range(self.n_trials):
             trial_id = str(uuid.uuid4())
-            learner_name = "lightgbm"  # You can later generalize this
+            learner_name = next(iter(self.learners))  # single learner for now
 
-            config = self.search.suggest(trial_id, learner_name)
+            config = self.searcher.suggest(trial_id, learner_name)
             model = self.learners[learner_name](config)
             model.fit(X, y)
 
-            y_pred = model.predict(X)
-            score = evaluate(y, y_pred, task=self.task)
+            preds = model.predict(X)
+            score = evaluate(y, preds, task=self.task)
+            print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
 
-            print(f"Trial {trial_num + 1}/{self.n_trials} — {learner_name} score={score:.4f}")
+            self.searcher.report(trial_id, score)
 
-            self.search.report(trial_id, score)
-
-            # Callbacks after each trial
-            for callback in self.callbacks:
-                callback.on_trial_end(trial_num + 1, score, config)
-
-            # MLflow log
-            if self.mlflow_helper:
-                self.mlflow_helper.log_params(config)
-                self.mlflow_helper.log_metrics({"score": score}, step=trial_num + 1)
-
-            # Track best
-            if (self.best_score is None) or (score < self.best_score):
+            is_best = self.best_score is None or score < self.best_score
+            if is_best:
                 self.best_score = score
                 self.best_model = model
 
-        if self.mlflow_helper:
-            self.mlflow_helper.end_run()
+            for cb in self.callbacks:
+                cb.on_trial_end(trial_id, config, score, is_best)
+
+            if self.mlflow:
+                self.mlflow.log_params(config)
+                self.mlflow.log_metrics({"score": score}, step=i+1)
+
+        if self.mlflow:
+            self.mlflow.end_run()
 
     def predict(self, X):
         if self.best_model is None:
-            raise ValueError("You must call .fit() before .predict()")
+            raise RuntimeError("Call fit() before predict()")
         return self.best_model.predict(X)

@@ -2,33 +2,42 @@
 # ml_teammate/search/optuna_search.py
 
 import optuna
+from typing import Dict
 
 class OptunaSearcher:
-    def __init__(self, config_spaces, direction="minimize", seed=42):
+    def __init__(self, config_spaces: Dict[str, Dict]):
+        """
+        config_spaces: 
+          {"learner_name": {"param": {"type": "int"/"float"/"categorical", "bounds"/"choices": [...]}, ...}}
+        """
         self.config_spaces = config_spaces
-        self.study = optuna.create_study(direction=direction,
-                                         sampler=optuna.samplers.TPESampler(seed=seed))
+        self.study = optuna.create_study(direction="minimize",
+                                         sampler=optuna.samplers.TPESampler())
         self.trials = {}
 
-    def suggest(self, trial_id, learner_name):
+    def suggest(self, trial_id: str, learner_name: str) -> Dict:
         trial = self.study.ask()
         self.trials[trial_id] = trial
+
         space = self.config_spaces[learner_name]
         config = {}
         for name, spec in space.items():
-            if spec["type"] == "int":
-                config[name] = trial.suggest_int(name, *spec["bounds"])
-            elif spec["type"] == "float":
-                config[name] = trial.suggest_float(name, *spec["bounds"])
-            elif spec["type"] == "categorical":
+            t = spec["type"]
+            if t == "int":
+                low, high = spec["bounds"]
+                config[name] = trial.suggest_int(name, low, high)
+            elif t == "float":
+                low, high = spec["bounds"]
+                config[name] = trial.suggest_float(name, low, high)
+            elif t == "categorical":
                 config[name] = trial.suggest_categorical(name, spec["choices"])
         return config
 
-    def report(self, trial_id, score):
+    def report(self, trial_id: str, score: float):
         trial = self.trials.get(trial_id)
         if not trial:
-            raise KeyError(f"Trial {trial_id} not registered")
+            raise KeyError(f"Unknown trial_id: {trial_id}")
         self.study.tell(trial, score)
 
-    def get_best_config(self):
+    def get_best(self) -> Dict:
         return self.study.best_trial.params
