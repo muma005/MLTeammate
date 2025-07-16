@@ -30,32 +30,37 @@ class AutoMLController:
             trial_id = str(uuid.uuid4())
             learner_name = next(iter(self.learners))  # single learner for now
 
-            config = self.searcher.suggest(trial_id, learner_name)
-            model = self.learners[learner_name](config)
-            model.fit(X, y)
+            try:
+                config = self.searcher.suggest(trial_id, learner_name)
+                model = self.learners[learner_name](config)
+                model.fit(X, y)
 
-            preds = model.predict(X)
-            score = evaluate(y, preds, task=self.task)
-            print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
+                preds = model.predict(X)
+                score = evaluate(y, preds, task=self.task)
+                print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
 
-            self.searcher.report(trial_id, score)
+                self.searcher.report(trial_id, score)
 
-            is_best = self.best_score is None or score < self.best_score
-            if is_best:
-                self.best_score = score
-                self.best_model = model
+                is_best = self.best_score is None or score < self.best_score
+                if is_best:
+                    self.best_score = score
+                    self.best_model = model
 
-            for cb in self.callbacks:
-                cb.on_trial_end(trial_id, config, score, is_best)
+                for cb in self.callbacks:
+                    cb.on_trial_end(trial_id, config, score, is_best)
 
-            if self.mlflow:
-                self.mlflow.log_params(config)
-                self.mlflow.log_metrics({"score": score}, step=i+1)
+                if self.mlflow:
+                    self.mlflow.log_params(config)
+                    self.mlflow.log_metrics({"score": score}, step=i+1)
+
+            except Exception as e:
+                print(f"[Warning] Trial {i+1} failed: {e}")
+                continue
 
         if self.mlflow:
             self.mlflow.end_run()
 
     def predict(self, X):
         if self.best_model is None:
-            raise RuntimeError("Call fit() before predict()")
+            raise ValueError("No trained model found. Please call .fit() first and ensure at least one successful trial.")
         return self.best_model.predict(X)
