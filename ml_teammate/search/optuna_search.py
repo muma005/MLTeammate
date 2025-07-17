@@ -2,7 +2,12 @@
 # ml_teammate/search/optuna_search.py
 
 import optuna
-from typing import Dict
+from typing import Dict 
+from optuna.trial import TrialState
+#from optuna.integration import OptunaPruningCallback
+
+
+
 
 class OptunaSearcher:
     def __init__(self, config_spaces: Dict[str, Dict]):
@@ -38,6 +43,14 @@ class OptunaSearcher:
         if not trial:
             raise KeyError(f"Unknown trial_id: {trial_id}")
         self.study.tell(trial, score)
+
+ #   def get_pruning_callback(self, trial_id: str, estimator, X, y):
+ #       trial = self.trials.get(trial_id)
+ #       if not trial:
+ #           raise KeyError(f"Unknown trial_id: {trial_id}")
+
+ #       return OptunaPruningCallback(trial, "accuracy")
+    
 
     def get_best(self) -> Dict:
         return self.study.best_trial.params

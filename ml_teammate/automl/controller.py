@@ -1,4 +1,5 @@
 import uuid
+from sklearn.model_selection import cross_val_predict  # ✅ CV support
 from ml_teammate.utils.metrics import evaluate
 
 class AutoMLController:
@@ -10,7 +11,8 @@ class AutoMLController:
         task: str = "classification",
         n_trials: int = 10,
         callbacks: list = None,
-        mlflow_helper = None
+        mlflow_helper = None,
+        cv: int = None  # ✅ added
     ):
         self.learners = learners
         self.searcher = searcher
@@ -21,6 +23,7 @@ class AutoMLController:
         self.mlflow = mlflow_helper
         self.best_score = None
         self.best_model = None
+        self.cv = cv  # ✅ store cross-validation folds
 
     def fit(self, X, y):
         if self.mlflow:
@@ -28,14 +31,30 @@ class AutoMLController:
 
         for i in range(self.n_trials):
             trial_id = str(uuid.uuid4())
-            learner_name = next(iter(self.learners))  # single learner for now
+            learner_name = "xgboost"  # force using xgboost for a quick test
 
             try:
                 config = self.searcher.suggest(trial_id, learner_name)
                 model = self.learners[learner_name](config)
-                model.fit(X, y)
 
-                preds = model.predict(X)
+                if self.cv:
+                    # ✅ Cross-validation path
+                    preds = cross_val_predict(model, X, y, cv=self.cv)
+                    model.fit(X, y)  # still fit full model for .predict()
+                else:
+                    # 🔧 Pruning logic temporarily disabled
+                    # if hasattr(self.searcher, "get_pruning_callback"):
+                    #     try:
+                    #         pruning_cb = self.searcher.get_pruning_callback(trial_id, model, X, y)
+                    #         model.fit(X, y, callbacks=[pruning_cb])
+                    #     except Exception:
+                    #         model.fit(X, y)
+                    # else:
+                    #     model.fit(X, y)
+                    model.fit(X, y)  # simple fallback without pruning
+
+                    preds = model.predict(X)
+
                 score = evaluate(y, preds, task=self.task)
                 print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
 

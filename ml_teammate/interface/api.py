@@ -1,11 +1,16 @@
 
 # ml_teammate/interface/api.py
 
+
 from ml_teammate.learners.lightgbm_learner import get_lightgbm_learner
+from ml_teammate.learners.xgboost_learner import get_xgboost_learner
 from ml_teammate.search.optuna_search import OptunaSearcher
 from ml_teammate.automl.controller import AutoMLController
 from ml_teammate.automl.callbacks import LoggerCallback
 from ml_teammate.experiments.mlflow_helper import MLflowHelper
+from ml_teammate.search.config_space import lightgbm_config, xgboost_config
+
+
 
 class MLTeammate:
     def __init__(self,
@@ -17,17 +22,16 @@ class MLTeammate:
 
         # Learner registry
         self.learners = {
-            "lightgbm": get_lightgbm_learner
+            "lightgbm": get_lightgbm_learner,
+            "xgboost": get_xgboost_learner
         }
 
         # Config spaces per learner
         self.config_spaces = {
-            "lightgbm": {
-                "max_depth": {"type": "int", "bounds": [3, 8]},
-                "learning_rate": {"type": "float", "bounds": [0.01, 0.3]},
-                "n_estimators": {"type": "int", "bounds": [50, 300]},
-            }
+            "lightgbm": lightgbm_config,
+            "xgboost": xgboost_config
         }
+
 
         # Initialize searcher
         self.searcher = OptunaSearcher(self.config_spaces)
