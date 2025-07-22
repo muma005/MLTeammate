@@ -1,17 +1,12 @@
-"""
-01_quickstart_basic.py
------------------------
-Minimal working example using MLTeammate with synthetic data.
-"""
-
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
 from ml_teammate.automl.controller import AutoMLController
-from ml_teammate.search.optuna_search import OptunaSearch
-from ml_teammate.learners.xgboost_learner import xgboost_learner
+from ml_teammate.search.optuna_search import OptunaSearcher
+from ml_teammate.learners import get_learner
+from ml_teammate.search.config_space import xgboost_config
 
 # 1. Create synthetic classification dataset
 X, y = make_classification(
@@ -23,21 +18,17 @@ X, y = make_classification(
 )
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# 2. Define config space for xgboost
-config_space = {
-    "max_depth": [3, 5, 7],
-    "learning_rate": [0.01, 0.1, 0.3],
-    "n_estimators": [50, 100]
-}
+# 2. Define config space
+config_space = {"xgboost": xgboost_config}
 
 # 3. Set up the controller
 controller = AutoMLController(
-    learners={"xgboost": xgboost_learner},
-    searcher=OptunaSearch(config_space),
+    learners={"xgboost": get_learner("xgboost")},
+    searcher=OptunaSearcher(config_space),
     config_space=config_space,
     task="classification",
     n_trials=5,
-    cv=None  # no cross-validation for this example
+    cv=None
 )
 
 # 4. Fit the model

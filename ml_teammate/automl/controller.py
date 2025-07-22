@@ -65,7 +65,7 @@ class AutoMLController:
 
                 self.searcher.report(trial_id, score)
 
-                is_best = self.best_score is None or score < self.best_score
+                is_best = self.best_score is None or score > self.best_score
                 if is_best:
                     self.best_score = score
                     self.best_model = model
