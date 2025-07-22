@@ -1,4 +1,5 @@
 import uuid
+import time 
 from sklearn.model_selection import cross_val_predict  # ✅ CV support
 from ml_teammate.utils.metrics import evaluate
 
@@ -31,6 +32,7 @@ class AutoMLController:
 
         for i in range(self.n_trials):
             trial_id = str(uuid.uuid4())
+            start_time = time.time()  # ✅ Start timer
             learner_name = "xgboost"  # force using xgboost for a quick test
 
             try:
@@ -54,8 +56,11 @@ class AutoMLController:
                     model.fit(X, y)  # simple fallback without pruning
 
                     preds = model.predict(X)
-
+                duration = time.time() - start_time  # ✅ End timer
                 score = evaluate(y, preds, task=self.task)
+                print(f"Trial {i+1}/{self.n_trials} | Learner: {learner_name} | Score: {score:.4f} | Duration: {duration:.2f}s")
+                print(f"Config: {config}")
+
                 print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
 
                 self.searcher.report(trial_id, score)
@@ -82,4 +87,13 @@ class AutoMLController:
     def predict(self, X):
         if self.best_model is None:
             raise ValueError("No trained model found. Please call .fit() first and ensure at least one successful trial.")
-        return self.best_model.predict(X)
+        return self.best_model.predict(X) 
+
+    def score(self, X, y):
+        """
+        Returns a task-appropriate score for the best model on given data.
+        Equivalent to sklearn's .score() method.
+        """
+        preds = self.predict(X)
+        return evaluate(y, preds, task=self.task)
+    
