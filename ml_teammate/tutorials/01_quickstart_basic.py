@@ -9,7 +9,7 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-from ml_teammate.core.controller import AutoMLController
+from ml_teammate.automl.controller import AutoMLController
 from ml_teammate.search.optuna_search import OptunaSearch
 from ml_teammate.learners.xgboost_learner import xgboost_learner
 
