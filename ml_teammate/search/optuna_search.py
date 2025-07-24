@@ -43,7 +43,7 @@ class OptunaSearcher:
         if not trial:
             raise KeyError(f"Unknown trial_id: {trial_id}")
         self.study.tell(trial, score)
-
+ # temporaliry disabled pruning callback
  #   def get_pruning_callback(self, trial_id: str, estimator, X, y):
  #       trial = self.trials.get(trial_id)
  #       if not trial:
