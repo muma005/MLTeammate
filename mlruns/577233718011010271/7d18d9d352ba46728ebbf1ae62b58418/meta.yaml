@@ -1,0 +1,15 @@
+artifact_uri: file:C:/Users/ADMIN/Desktop/MLTeammate/mlruns/577233718011010271/7d18d9d352ba46728ebbf1ae62b58418/artifacts
+end_time: 1753890145629
+entry_point_name: ''
+experiment_id: '577233718011010271'
+lifecycle_stage: active
+run_id: 7d18d9d352ba46728ebbf1ae62b58418
+run_name: xgboost_optimization
+run_uuid: 7d18d9d352ba46728ebbf1ae62b58418
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753890140228
+status: 3
+tags: []
+user_id: G muma

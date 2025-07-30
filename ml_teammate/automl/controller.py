@@ -28,41 +28,46 @@ class AutoMLController:
         self.cv = cv  # ✅ store cross-validation folds
 
     def fit(self, X, y):
+        # Prepare experiment configuration
+        experiment_config = {
+            "task": self.task,
+            "n_trials": self.n_trials,
+            "cv": self.cv,
+            "learners": list(self.learners.keys()),
+            "data_shape": X.shape
+        }
+        
+        # Notify callbacks of experiment start
+        for cb in self.callbacks:
+            cb.on_experiment_start(experiment_config)
+        
         if self.mlflow:
             self.mlflow.start_run()
 
         for i in range(self.n_trials):
             trial_id = str(uuid.uuid4())
-            start_time = time.time()  # ✅ Start timer
+            start_time = time.time()
             learner_name = "xgboost"  # force using xgboost for a quick test
 
             try:
                 config = self.searcher.suggest(trial_id, learner_name)
+                
+                # Notify callbacks of trial start
+                for cb in self.callbacks:
+                    cb.on_trial_start(trial_id, config)
+                
                 model = self.learners[learner_name](config)
 
                 if self.cv:
-                    # ✅ Cross-validation path
+                    # Cross-validation path
                     preds = cross_val_predict(model, X, y, cv=self.cv)
                     model.fit(X, y)  # still fit full model for .predict()
                 else:
-                    # 🔧 Pruning logic temporarily disabled
-                    # if hasattr(self.searcher, "get_pruning_callback"):
-                    #     try:
-                    #         pruning_cb = self.searcher.get_pruning_callback(trial_id, model, X, y)
-                    #         model.fit(X, y, callbacks=[pruning_cb])
-                    #     except Exception:
-                    #         model.fit(X, y)
-                    # else:
-                    #     model.fit(X, y)
                     model.fit(X, y)  # simple fallback without pruning
-
                     preds = model.predict(X)
-                duration = time.time() - start_time  # ✅ End timer
+                
+                duration = time.time() - start_time
                 score = evaluate(y, preds, task=self.task)
-                print(f"Trial {i+1}/{self.n_trials} | Learner: {learner_name} | Score: {score:.4f} | Duration: {duration:.2f}s")
-                print(f"Config: {config}")
-
-                print(f"Trial {i+1}/{self.n_trials} — {learner_name} score={score:.4f}")
 
                 self.searcher.report(trial_id, score)
 
@@ -71,6 +76,7 @@ class AutoMLController:
                     self.best_score = score
                     self.best_model = model
 
+                # Notify callbacks of trial end
                 for cb in self.callbacks:
                     cb.on_trial_end(trial_id, config, score, is_best)
 
@@ -81,6 +87,10 @@ class AutoMLController:
             except Exception as e:
                 print(f"[Warning] Trial {i+1} failed: {e}")
                 continue
+
+        # Notify callbacks of experiment end
+        for cb in self.callbacks:
+            cb.on_experiment_end(self.best_score, self.searcher.get_best())
 
         if self.mlflow:
             self.mlflow.end_run()
