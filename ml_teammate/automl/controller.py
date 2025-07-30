@@ -40,9 +40,6 @@ class AutoMLController:
         # Notify callbacks of experiment start
         for cb in self.callbacks:
             cb.on_experiment_start(experiment_config)
-        
-        if self.mlflow:
-            self.mlflow.start_run()
 
         for i in range(self.n_trials):
             trial_id = str(uuid.uuid4())
@@ -80,10 +77,6 @@ class AutoMLController:
                 for cb in self.callbacks:
                     cb.on_trial_end(trial_id, config, score, is_best)
 
-                if self.mlflow:
-                    self.mlflow.log_params(config)
-                    self.mlflow.log_metrics({"score": score}, step=i+1)
-
             except Exception as e:
                 print(f"[Warning] Trial {i+1} failed: {e}")
                 continue
@@ -91,9 +84,6 @@ class AutoMLController:
         # Notify callbacks of experiment end
         for cb in self.callbacks:
             cb.on_experiment_end(self.best_score, self.searcher.get_best())
-
-        if self.mlflow:
-            self.mlflow.end_run()
 
     def predict(self, X):
         if self.best_model is None:

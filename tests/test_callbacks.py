@@ -120,6 +120,32 @@ class TestLoggerCallback:
         with patch.object(callback, '_log') as mock_log:
             callback.on_experiment_end(0.9, {"param": 2})
             mock_log.assert_called()
+    
+    def test_logger_callback_mlflow_integration(self):
+        """Test LoggerCallback with MLflow integration."""
+        with patch('ml_teammate.experiments.mlflow_helper.MLflowHelper') as mock_mlflow_class:
+            mock_mlflow = Mock()
+            mock_mlflow_class.return_value = mock_mlflow
+            
+            callback = LoggerCallback(use_mlflow=True)
+            
+            # Test experiment start with MLflow
+            callback.on_experiment_start({"n_trials": 10})
+            mock_mlflow.start_experiment.assert_called_once()
+            
+            # Test trial start with MLflow
+            callback.on_trial_start("trial1", {"param": 1})
+            mock_mlflow.start_trial.assert_called_once()
+            
+            # Test trial end with MLflow
+            callback.on_trial_end("trial1", {"param": 1}, 0.8, True)
+            mock_mlflow.log_trial_metrics.assert_called_once()
+            mock_mlflow.end_trial.assert_called_once()
+            
+            # Test experiment end with MLflow
+            callback.on_experiment_end(0.9, {"param": 2})
+            mock_mlflow.log_experiment_summary.assert_called_once()
+            mock_mlflow.end_experiment.assert_called_once()
 
 
 class TestProgressCallback:
@@ -338,6 +364,38 @@ class TestCallbackIntegration:
         # Test experiment end
         for callback in callbacks:
             callback.on_experiment_end(0.9, {"param": 2})
+    
+    def test_mlflow_integration_lifecycle(self):
+        """Test MLflow integration through complete lifecycle."""
+        with patch('ml_teammate.experiments.mlflow_helper.MLflowHelper') as mock_mlflow_class:
+            mock_mlflow = Mock()
+            mock_mlflow_class.return_value = mock_mlflow
+            
+            callbacks = [LoggerCallback(use_mlflow=True)]
+            
+            # Test experiment start
+            callbacks[0].on_experiment_start({"n_trials": 3})
+            mock_mlflow.start_experiment.assert_called_once()
+            
+            # Test trial lifecycle
+            for i in range(3):
+                trial_id = f"trial_{i}"
+                config = {"param": i}
+                score = 0.7 + i * 0.1
+                is_best = (i == 2)
+                
+                callbacks[0].on_trial_start(trial_id, config)
+                callbacks[0].on_trial_end(trial_id, config, score, is_best)
+            
+            # Test experiment end
+            callbacks[0].on_experiment_end(0.9, {"param": 2})
+            
+            # Verify MLflow calls
+            assert mock_mlflow.start_trial.call_count == 3
+            assert mock_mlflow.log_trial_metrics.call_count == 3
+            assert mock_mlflow.end_trial.call_count == 3
+            mock_mlflow.log_experiment_summary.assert_called_once()
+            mock_mlflow.end_experiment.assert_called_once()
 
 
 if __name__ == "__main__":

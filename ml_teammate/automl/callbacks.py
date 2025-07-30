@@ -37,7 +37,7 @@ class LoggerCallback(BaseCallback):
     Features:
     - Structured logging with timestamps
     - Configurable log levels
-    - Optional MLflow integration
+    - Optional MLflow integration with nested runs
     - Trial progress tracking
     - Best model highlighting
     """
@@ -99,16 +99,25 @@ class LoggerCallback(BaseCallback):
         
         if self.use_mlflow and self.mlflow:
             try:
-                self.mlflow.start_run(run_name=f"{self.experiment_name}_{int(time.time())}")
-                self._log("✅ MLflow run started")
+                # Start the main experiment run
+                self.mlflow.start_experiment(experiment_config=experiment_config)
+                self._log("✅ MLflow experiment started with nested runs support")
             except Exception as e:
-                self._log(f"❌ Failed to start MLflow run: {e}", "ERROR")
+                self._log(f"❌ Failed to start MLflow experiment: {e}", "ERROR")
     
     def on_trial_start(self, trial_id: str, config: dict) -> None:
         """Log trial start with configuration."""
         self.trial_count += 1
         self._log(f"🔬 Starting trial {self.trial_count} (ID: {trial_id[:8]}...)")
         self._log(f"⚙️  Config: {json.dumps(config, indent=2)}")
+        
+        if self.use_mlflow and self.mlflow:
+            try:
+                # Start nested trial run
+                self.mlflow.start_trial(trial_id, self.trial_count, config)
+                self._log(f"✅ MLflow trial {self.trial_count} started")
+            except Exception as e:
+                self._log(f"❌ Failed to start MLflow trial: {e}", "ERROR")
     
     def on_trial_end(self, trial_id: str, config: dict, score: float, is_best: bool) -> None:
         """Log trial results with enhanced formatting."""
@@ -124,10 +133,17 @@ class LoggerCallback(BaseCallback):
         # Log to MLflow if enabled
         if self.use_mlflow and self.mlflow:
             try:
-                self.mlflow.log_params(config)
-                self.mlflow.log_metrics({"score": score, "trial_number": self.trial_count})
-                if is_best:
-                    self.mlflow.log_metrics({"best_score": score})
+                # Log trial metrics
+                trial_metrics = {
+                    "score": score,
+                    "trial_number": self.trial_count,
+                    "is_best": is_best
+                }
+                self.mlflow.log_trial_metrics(trial_metrics)
+                
+                # End the trial run
+                self.mlflow.end_trial()
+                self._log(f"✅ MLflow trial {self.trial_count} completed")
             except Exception as e:
                 self._log(f"❌ MLflow logging failed: {e}", "ERROR")
     
@@ -143,11 +159,19 @@ class LoggerCallback(BaseCallback):
         
         if self.use_mlflow and self.mlflow:
             try:
-                self.mlflow.log_metrics({"final_best_score": best_score, "total_trials": self.trial_count})
-                self.mlflow.end_run()
-                self._log("✅ MLflow run completed")
+                # Log experiment summary
+                self.mlflow.log_experiment_summary(
+                    best_score=best_score,
+                    best_config=best_config,
+                    total_trials=self.trial_count,
+                    experiment_duration=total_duration
+                )
+                
+                # End the experiment
+                self.mlflow.end_experiment()
+                self._log("✅ MLflow experiment completed")
             except Exception as e:
-                self._log(f"❌ Failed to end MLflow run: {e}", "ERROR")
+                self._log(f"❌ Failed to end MLflow experiment: {e}", "ERROR")
 
 
 class ProgressCallback(BaseCallback):

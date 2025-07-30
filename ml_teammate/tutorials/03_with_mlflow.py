@@ -2,8 +2,8 @@
 """
 03_with_mlflow.py
 -----------------
-Demonstrate MLTeammate with MLflow experiment tracking and artifact management.
-Shows how to track experiments, log parameters, metrics, and save artifacts.
+Demonstrate MLTeammate with enhanced MLflow experiment tracking and artifact management.
+Shows professional-grade experiment tracking with nested runs for trial-level granularity.
 """
 
 import os
@@ -90,7 +90,7 @@ def main():
         }
     }
     
-    # Create callbacks
+    # Create callbacks with enhanced MLflow support
     callbacks = [
         LoggerCallback(
             use_mlflow=True,
@@ -105,82 +105,94 @@ def main():
         )
     ]
     
-    # Initialize MLflow helper
+    # Initialize MLflow helper (optional - callbacks handle MLflow internally)
     mlflow_helper = MLflowHelper(
         experiment_name="mlteammate_tutorial",
         tracking_uri="file:./mlruns"
     )
     
-    # Start MLflow run
-    with mlflow_helper.start_run("mlteammate_tutorial_run"):
-        # Log dataset information
-        mlflow.log_params({
-            "dataset.samples": X.shape[0],
-            "dataset.features": X.shape[1],
-            "dataset.classes": len(np.unique(y)),
-            "test_size": 0.2
-        })
-        
-        # Create and run AutoML controller
-        print("🚀 Starting AutoML experiment with MLflow tracking...")
-        controller = AutoMLController(
-            learners={"xgboost": XGBoostLearner},
-            searcher=OptunaSearcher(config_space),
-            config_space=config_space,
-            task="classification",
-            n_trials=10,
-            cv=3,
-            callbacks=callbacks,
-            mlflow_helper=mlflow_helper
+    print("🚀 Starting AutoML experiment with enhanced MLflow tracking...")
+    print("📋 This will create nested runs for each trial with detailed tracking")
+    
+    # Create and run AutoML controller
+    controller = AutoMLController(
+        learners={"xgboost": XGBoostLearner},
+        searcher=OptunaSearcher(config_space),
+        config_space=config_space,
+        task="classification",
+        n_trials=10,
+        cv=3,
+        callbacks=callbacks,
+        mlflow_helper=mlflow_helper  # Optional - callbacks handle MLflow
+    )
+    
+    # Fit the model
+    controller.fit(X_train, y_train)
+    
+    # Make predictions
+    y_pred = controller.predict(X_test)
+    test_accuracy = accuracy_score(y_test, y_pred)
+    
+    # Create and save feature importance plot
+    if controller.best_model:
+        plot_path = create_feature_importance_plot(
+            controller.best_model,
+            feature_names=[f"feature_{i}" for i in range(X.shape[1])]
         )
         
-        # Fit the model
-        controller.fit(X_train, y_train)
-        
-        # Make predictions
-        y_pred = controller.predict(X_test)
-        test_accuracy = accuracy_score(y_test, y_pred)
-        
-        # Log final results
-        mlflow.log_metrics({
-            "test_set_score": test_accuracy,
-            "best_cv_score": controller.best_score
-        })
-        
-        # Create and log feature importance plot
-        if controller.best_model:
-            plot_path = create_feature_importance_plot(
-                controller.best_model,
-                feature_names=[f"feature_{i}" for i in range(X.shape[1])]
-            )
-            if plot_path:
-                mlflow.log_artifact(plot_path)
-        
-        # Log classification report
-        report = classification_report(y_test, y_pred, output_dict=True)
-        mlflow.log_metrics({
-            "precision_macro": report['macro avg']['precision'],
-            "recall_macro": report['macro avg']['recall'],
-            "f1_macro": report['macro avg']['f1-score']
-        })
-        
-        # Save the best model
-        if hasattr(controller, 'best_model') and controller.best_model:
-            try:
-                import joblib
-                model_path = "./best_model.pkl"
-                joblib.dump(controller.best_model, model_path)
-                mlflow.log_artifact(model_path)
-                print(f"💾 Best model saved and logged to MLflow")
-            except ImportError:
-                print("⚠️ joblib not available. Skipping model save.")
-        
-        print(f"\n🎉 Experiment completed!")
-        print(f"📈 Best CV Score: {controller.best_score:.4f}")
-        print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-        print(f"📊 Best Configuration: {controller.searcher.get_best()}")
-        print(f"📁 MLflow tracking URI: {mlflow.get_tracking_uri()}")
-        print(f"🔗 View results: mlflow ui --backend-store-uri {mlflow.get_tracking_uri()}")
+        # Log the plot as an experiment artifact
+        if plot_path and hasattr(controller, 'callbacks'):
+            for callback in controller.callbacks:
+                if hasattr(callback, 'mlflow') and callback.mlflow:
+                    try:
+                        callback.mlflow.log_experiment_artifact(plot_path, "feature_importance.png")
+                        print(f"📊 Feature importance plot logged to MLflow")
+                    except Exception as e:
+                        print(f"⚠️ Failed to log plot to MLflow: {e}")
+    
+    # Log classification report
+    report = classification_report(y_test, y_pred, output_dict=True)
+    
+    # Save the best model
+    if hasattr(controller, 'best_model') and controller.best_model:
+        try:
+            import joblib
+            model_path = "./best_model.pkl"
+            joblib.dump(controller.best_model, model_path)
+            
+            # Log model as experiment artifact
+            for callback in controller.callbacks:
+                if hasattr(callback, 'mlflow') and callback.mlflow:
+                    try:
+                        callback.mlflow.log_experiment_artifact(model_path, "best_model.pkl")
+                        print(f"💾 Best model saved and logged to MLflow")
+                    except Exception as e:
+                        print(f"⚠️ Failed to log model to MLflow: {e}")
+            
+            # Clean up
+            os.remove(model_path)
+        except ImportError:
+            print("⚠️ joblib not available. Skipping model save.")
+    
+    print(f"\n🎉 Experiment completed!")
+    print(f"📈 Best CV Score: {controller.best_score:.4f}")
+    print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+    print(f"📊 Best Configuration: {controller.searcher.get_best()}")
+    print(f"📁 MLflow tracking URI: {mlflow.get_tracking_uri()}")
+    print(f"🔗 View results: mlflow ui --backend-store-uri {mlflow.get_tracking_uri()}")
+    
+    # Show MLflow experiment structure
+    print(f"\n📋 MLflow Experiment Structure:")
+    print(f"   Experiment: mlteammate_tutorial")
+    print(f"   ├── Parent Run: Contains experiment summary and best results")
+    print(f"   ├── Trial 1: Individual trial with parameters and metrics")
+    print(f"   ├── Trial 2: Individual trial with parameters and metrics")
+    print(f"   └── ... (one nested run per trial)")
+    print(f"\n💡 Benefits of this structure:")
+    print(f"   • Each trial has its own run with detailed parameters")
+    print(f"   • Easy to compare trials within the experiment")
+    print(f"   • Professional-grade experiment tracking")
+    print(f"   • Rich metadata and artifact management")
 
 if __name__ == "__main__":
     main()
