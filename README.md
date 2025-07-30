@@ -31,7 +31,7 @@ cd ml_teammate
 pip install -r requirements.txt
 ````
 
-### Option 2: Install directly via pip (⚠️ only works if you've published it)
+### Option 2: Install directly via pip (⚠️ only works if  published )
 
 ```bash
 pip install git+https://github.com/yourusername/ml_teammate.git
