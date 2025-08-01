@@ -155,6 +155,31 @@
   - Clear distinction between simple and advanced APIs
   - List of all available learners
 
+### 🔍 Advanced Search System ✅
+- [x] **FLAML Integration**
+  - FLAMLSearcher with time-bounded optimization
+  - FLAMLTimeBudgetSearcher for time-constrained scenarios
+  - FLAMLResourceAwareSearcher for resource-constrained environments
+  - Automatic configuration space conversion
+  - Built-in early stopping and resource management
+- [x] **Early Convergence Indicators (ECI)**
+  - Standard ECI with multiple convergence detection methods
+  - Adaptive ECI with self-tuning parameters
+  - Multi-objective ECI for complex optimization scenarios
+  - Statistical analysis (moving average, confidence intervals, plateau detection)
+  - Resource-saving early stopping capabilities
+- [x] **Search Module Infrastructure**
+  - Unified search module with factory functions
+  - Easy component creation with `get_searcher()` and `get_eci()`
+  - Comprehensive component listing and information
+  - Backward compatibility with existing Optuna integration
+- [x] **Tutorial 07: Advanced Search Example**
+  - Complete demonstration of all new search capabilities
+  - FLAML optimization examples
+  - ECI convergence detection examples
+  - Factory function usage examples
+  - Resource-aware optimization demonstrations
+
 ### Quality Assurance
 - [ ] **Code quality improvements**
   - Type hints completion
