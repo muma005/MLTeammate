@@ -127,33 +127,36 @@
   - Different Python versions
   - Dependency compatibility
 
-### 🚀 Major Achievement: Simplified API System ✅
-- [x] **Learner Registry System**
-  - 20+ pre-built learners with automatic sklearn wrapping
-  - String-based learner selection
-  - Automatic configuration space generation
-  - Dependency management and validation
-- [x] **SimpleAutoML Class**
-  - No custom code required from users
-  - Automatic learner and config space creation
-  - Built-in MLflow integration
-  - Comprehensive results and artifacts
-- [x] **Quick Functions**
-  - `quick_classification()` and `quick_regression()` one-liners
-  - Perfect for Jupyter notebooks and beginners
-  - Sensible defaults for all parameters
-- [x] **Tutorial 06: Simple API Example**
-  - Complete demonstration of the new simplified API
-  - Shows how to use MLTeammate without writing custom code
-  - Covers all use cases from basic to advanced
-- [x] **Comprehensive Testing**
-  - Test suite for the simplified API
-  - Validation of all learner types
-  - Error handling and edge cases
-- [x] **Documentation Updates**
-  - Updated README with simple API examples
-  - Clear distinction between simple and advanced APIs
-  - List of all available learners
+### 🚀 Major Achievement: Pandas-Style API System ✅
+- [x] **Enhanced SimpleAutoML Backend**
+  - Auto-execution methods (no function definitions needed)
+  - Smart defaults and auto-detection
+  - Method chaining support (like pandas)
+  - One-click methods for immediate results
+- [x] **Auto-Configuration System**
+  - Auto-detect task type from data
+  - Auto-configure trials based on data size
+  - Auto-configure CV folds based on data size
+  - Auto-select learners based on task
+  - Auto-generate experiment names
+- [x] **Pandas-Style Interface**
+  - `automl.quick_classify(X, y)` - Auto-executes and prints results
+  - `automl.explore_learners()` - Auto-prints available learners
+  - `automl.with_mlflow().with_flaml().quick_classify(X, y)` - Method chaining
+  - Zero function definitions required
+- [x] **Enhanced Quick Functions**
+  - `quick_classification()` and `quick_regression()` with smart defaults
+  - Auto-configuration of all parameters
+  - Perfect for one-liner usage
+- [x] **Tutorial 08: Pandas-Style Example**
+  - Complete demonstration of pandas-style interface
+  - Shows how to use MLTeammate with zero function definitions
+  - Method chaining, auto-execution, and smart defaults
+- [x] **Backend-Driven Simplicity**
+  - All complexity moved to backend
+  - Users just call methods like pandas
+  - Auto-execution and printing of results
+  - Progressive disclosure of complexity
 
 ### 🔍 Advanced Search System ✅
 - [x] **FLAML Integration**

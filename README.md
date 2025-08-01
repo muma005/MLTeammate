@@ -61,26 +61,27 @@ pip install -e .
 
 ## 🧠 Quickstart Examples
 
-### 🚀 Simple API (Recommended for most users)
+### 🚀 Pandas-Style API (Recommended for most users)
 
-**No custom code required!** Just specify learner names as strings:
+**Zero function definitions required!** Just like using pandas:
 
 ```python
 from ml_teammate.interface import SimpleAutoML, quick_classification
 
-# Option 1: SimpleAutoML class
-automl = SimpleAutoML(
-    learners=["random_forest", "logistic_regression", "xgboost"],
-    task="classification",
-    n_trials=10,
-    cv=3
-)
-automl.fit(X_train, y_train)
-print("Test Score:", automl.score(X_test, y_test))
+# Option 1: Auto-execution with smart defaults
+automl = SimpleAutoML()
+automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
 
-# Option 2: One-liner function
-automl = quick_classification(X_train, y_train, n_trials=10)
-print("Best Score:", automl.best_score)
+# Option 2: Method chaining (like pandas)
+automl = SimpleAutoML()
+automl.with_mlflow().with_flaml(time_budget=30).quick_classify(X_train, y_train)
+
+# Option 3: One-liner function (ultimate simplicity)
+automl = quick_classification(X_train, y_train)  # Auto-configures everything!
+
+# Option 4: Explore available learners
+automl = SimpleAutoML()
+automl.explore_learners()  # Auto-prints all available learners
 ```
 
 ### 🔧 Advanced API (For power users)
