@@ -10,12 +10,26 @@ It integrates powerful tools like Optuna, XGBoost, LightGBM, and MLflow — allo
 
 ## 🚀 Features
 
+- 🚀 **Simple API** - Use MLTeammate without writing custom code
 - 🔄 Cross-validation support (built-in)
-- 🧠 Plug-and-play learners (XGBoost, LightGBM, etc.)
+- 🧠 **20+ Pre-built learners** (Random Forest, SVM, XGBoost, LightGBM, etc.)
 - 🧪 Hyperparameter tuning with Optuna
 - 🔬 MLflow experiment tracking (optional)
 - ⚙️ Easy to extend with custom learners & config spaces
 - 🧩 Clean modular architecture (great for hacking & research)
+
+## 📊 Available Learners
+
+### Classification
+- Random Forest, Logistic Regression, SVM, K-Nearest Neighbors
+- Decision Trees, Naive Bayes, Linear Discriminant Analysis
+- Gradient Boosting, Extra Trees, XGBoost, LightGBM
+
+### Regression  
+- Linear Regression, Ridge, Lasso, Random Forest Regressor
+- Gradient Boosting Regressor, SVR, K-Nearest Neighbors Regressor
+
+**Just specify learner names as strings!** No custom classes needed.
 
 ---
 
@@ -45,18 +59,42 @@ pip install -e .
 
 ---
 
-## 🧠 Quickstart Example
+## 🧠 Quickstart Examples
+
+### 🚀 Simple API (Recommended for most users)
+
+**No custom code required!** Just specify learner names as strings:
 
 ```python
-from ml_teammate.controller import AutoMLController
+from ml_teammate.interface import SimpleAutoML, quick_classification
+
+# Option 1: SimpleAutoML class
+automl = SimpleAutoML(
+    learners=["random_forest", "logistic_regression", "xgboost"],
+    task="classification",
+    n_trials=10,
+    cv=3
+)
+automl.fit(X_train, y_train)
+print("Test Score:", automl.score(X_test, y_test))
+
+# Option 2: One-liner function
+automl = quick_classification(X_train, y_train, n_trials=10)
+print("Best Score:", automl.best_score)
+```
+
+### 🔧 Advanced API (For power users)
+
+```python
+from ml_teammate.automl.controller import AutoMLController
 from ml_teammate.learners.xgboost_learner import get_xgboost_learner
-from ml_teammate.search.optuna_search import OptunaSearch
-from ml_teammate.utils.config_spaces import xgboost_config_space
+from ml_teammate.search.optuna_search import OptunaSearcher
+from ml_teammate.search.config_space import xgboost_config
 
 controller = AutoMLController(
     learners={"xgboost": get_xgboost_learner},
-    config_space={"xgboost": xgboost_config_space},
-    searcher=OptunaSearch({"xgboost": xgboost_config_space}),
+    config_space={"xgboost": xgboost_config},
+    searcher=OptunaSearcher({"xgboost": xgboost_config}),
     task="classification",
     n_trials=5,
     cv=3
