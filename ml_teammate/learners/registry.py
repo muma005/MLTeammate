@@ -246,6 +246,55 @@ class LearnerRegistry:
         )
         
         # ========================================================================
+        # PRE-BUILT CUSTOM LEARNERS (No def functions needed!)
+        # ========================================================================
+        
+        # Custom Random Forest with specific defaults
+        self._register_learner(
+            "custom_rf",
+            lambda config: SklearnWrapper(RandomForestClassifier, {
+                "n_estimators": config.get('n_estimators', 100),
+                "max_depth": config.get('max_depth', 10),
+                "min_samples_split": config.get('min_samples_split', 2),
+                "random_state": 42
+            }),
+            {
+                "n_estimators": {"type": "int", "bounds": [50, 300]},
+                "max_depth": {"type": "int", "bounds": [3, 15]},
+                "min_samples_split": {"type": "int", "bounds": [2, 20]}
+            },
+            dependencies=["sklearn"]
+        )
+        
+        # Custom Logistic Regression with specific defaults
+        self._register_learner(
+            "custom_lr",
+            lambda config: SklearnWrapper(LogisticRegression, {
+                "C": config.get('C', 1.0),
+                "max_iter": config.get('max_iter', 1000),
+                "random_state": 42
+            }),
+            {
+                "C": {"type": "float", "bounds": [0.1, 10.0]},
+                "max_iter": {"type": "int", "bounds": [100, 2000]}
+            },
+            dependencies=["sklearn"]
+        )
+        
+        # Ensemble learner (Random Forest + Logistic Regression)
+        self._register_learner(
+            "ensemble",
+            lambda config: self._create_ensemble_learner(config),
+            {
+                "rf_n_estimators": {"type": "int", "bounds": [50, 200]},
+                "rf_max_depth": {"type": "int", "bounds": [3, 15]},
+                "lr_C": {"type": "float", "bounds": [0.1, 10.0]},
+                "lr_max_iter": {"type": "int", "bounds": [100, 1000]}
+            },
+            dependencies=["sklearn"]
+        )
+        
+        # ========================================================================
         # REGRESSION LEARNERS
         # ========================================================================
         
@@ -469,6 +518,26 @@ class LearnerRegistry:
         for name in learner_names:
             config_space[name] = self.get_config_space(name)
         return config_space
+    
+    def _create_ensemble_learner(self, config):
+        """Create an ensemble learner (Random Forest + Logistic Regression)."""
+        from sklearn.ensemble import VotingClassifier
+        
+        rf = RandomForestClassifier(
+            n_estimators=config.get('rf_n_estimators', 100),
+            max_depth=config.get('rf_max_depth', 10),
+            random_state=42
+        )
+        lr = LogisticRegression(
+            C=config.get('lr_C', 1.0),
+            max_iter=config.get('lr_max_iter', 1000),
+            random_state=42
+        )
+        
+        return VotingClassifier(
+            estimators=[('rf', rf), ('lr', lr)],
+            voting='soft'
+        )
 
 
 # Global registry instance

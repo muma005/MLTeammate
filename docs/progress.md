@@ -149,7 +149,7 @@
   - Auto-configuration of all parameters
   - Perfect for one-liner usage
 - [x] **Complete Tutorial Transformation**
-  - **Tutorial 04**: Custom learners with registry system (no complex classes)
+  - **Tutorial 04**: Custom learners with ZERO def functions (pre-built + backend methods)
   - **Tutorial 05**: Advanced Optuna with pandas-style interface
   - **Tutorial 06**: Simple API transformed to pandas-style
   - **Tutorial 07**: Advanced search with auto-execution

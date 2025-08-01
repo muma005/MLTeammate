@@ -373,6 +373,61 @@ class SimpleAutoML:
             setattr(self, key, value)
         return self
     
+    def add_custom_learner(self, name: str, model_class, config_space: Dict[str, Any], **default_params):
+        """Add a custom learner without writing def functions."""
+        from ml_teammate.learners.registry import get_learner_registry
+        from ml_teammate.learners.registry import SklearnWrapper
+        
+        # Create factory function using lambda (no def needed!)
+        factory = lambda config: SklearnWrapper(model_class, {**default_params, **config})
+        
+        # Register the learner
+        registry = get_learner_registry()
+        registry._register_learner(name, factory, config_space)
+        
+        print(f"✅ Custom learner '{name}' registered successfully!")
+        return self
+    
+    def add_ensemble_learner(self, name: str, learners: List[str], config_space: Dict[str, Any]):
+        """Add an ensemble learner without writing def functions."""
+        from ml_teammate.learners.registry import get_learner_registry
+        from sklearn.ensemble import VotingClassifier
+        
+        def ensemble_factory(config):
+            """Factory function for ensemble learner."""
+            from sklearn.ensemble import RandomForestClassifier
+            from sklearn.linear_model import LogisticRegression
+            
+            models = []
+            for i, learner_name in enumerate(learners):
+                if learner_name == "random_forest":
+                    model = RandomForestClassifier(
+                        n_estimators=config.get(f'{learner_name}_n_estimators', 100),
+                        max_depth=config.get(f'{learner_name}_max_depth', 10),
+                        random_state=42 + i
+                    )
+                elif learner_name == "logistic_regression":
+                    model = LogisticRegression(
+                        C=config.get(f'{learner_name}_C', 1.0),
+                        max_iter=config.get(f'{learner_name}_max_iter', 1000),
+                        random_state=42 + i
+                    )
+                else:
+                    # Use default learner
+                    from ml_teammate.learners.registry import get_learner
+                    model = get_learner(learner_name)(config)
+                
+                models.append((learner_name, model))
+            
+            return VotingClassifier(estimators=models, voting='soft')
+        
+        # Register the ensemble learner
+        registry = get_learner_registry()
+        registry._register_learner(name, ensemble_factory, config_space)
+        
+        print(f"✅ Ensemble learner '{name}' registered successfully!")
+        return self
+    
     # ============================================================================
     # ORIGINAL METHODS (ENHANCED)
     # ============================================================================
