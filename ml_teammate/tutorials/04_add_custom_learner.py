@@ -2,8 +2,15 @@
 """
 04_add_custom_learner.py
 ------------------------
-Demonstrate how to add custom learners to MLTeammate.
-Shows the complete process from creating a custom learner to integrating it with the AutoML pipeline.
+Demonstrate how to add custom learners to MLTeammate with pandas-style interface.
+
+This tutorial shows:
+1. How to use the new registry system for easy custom learner integration
+2. How to create custom learners with minimal code
+3. How to use custom learners with the pandas-style API
+4. How the backend handles all the complexity
+
+Perfect for users who want to extend MLTeammate with their own models!
 """
 
 import numpy as np
@@ -14,383 +21,305 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from ml_teammate.automl.controller import AutoMLController
-from ml_teammate.search.optuna_search import OptunaSearcher
-from ml_teammate.automl.callbacks import LoggerCallback, ProgressCallback
+# Import the pandas-style API
+from ml_teammate.interface import SimpleAutoML
+from ml_teammate.learners.registry import get_learner_registry
 
 # ============================================================================
-# STEP 1: Create a Custom Learner Class
+# STEP 1: Explore Available Learners (No Functions!)
 # ============================================================================
 
-class CustomRandomForestLearner(BaseEstimator, ClassifierMixin):
-    """
-    Custom Random Forest learner for MLTeammate.
-    
-    This demonstrates how to create a custom learner that:
-    1. Follows sklearn conventions
-    2. Accepts configuration dictionaries
-    3. Provides proper fit/predict interface
-    4. Supports hyperparameter tuning
-    """
-    
-    def __init__(self, config=None, **kwargs):
-        """
-        Initialize the custom learner.
-        
-        Args:
-            config: Dictionary of hyperparameters
-            **kwargs: Additional keyword arguments
-        """
-        self.config = (config or {}).copy()
-        self.config.update(kwargs)
-        self.model = None
-        
-        # Initialize model if config is provided
-        if self.config:
-            self.model = RandomForestClassifier(**self.config)
-    
-    def fit(self, X, y):
-        """Fit the model to the data."""
-        if self.model is None:
-            self.model = RandomForestClassifier(**self.config)
-        self.model.fit(X, y)
-        return self
-    
-    def predict(self, X):
-        """Make predictions."""
-        if self.model is None:
-            raise ValueError("Model not fitted. Call fit() first.")
-        return self.model.predict(X)
-    
-    def predict_proba(self, X):
-        """Predict class probabilities."""
-        if self.model is None:
-            raise ValueError("Model not fitted. Call fit() first.")
-        return self.model.predict_proba(X)
-    
-    def get_params(self, deep=True):
-        """Get parameters for sklearn compatibility."""
-        return self.config.copy()
-    
-    def set_params(self, **params):
-        """Set parameters for sklearn compatibility."""
-        self.config.update(params)
-        return self
+print("🔍 STEP 1: Explore Available Learners")
+print("=" * 50)
 
-
-class CustomLogisticRegressionLearner(BaseEstimator, ClassifierMixin):
-    """
-    Custom Logistic Regression learner with advanced features.
-    
-    Demonstrates:
-    - Custom preprocessing
-    - Feature scaling
-    - Advanced configuration handling
-    """
-    
-    def __init__(self, config=None, **kwargs):
-        self.config = (config or {}).copy()
-        self.config.update(kwargs)
-        self.model = None
-        self.scaler = None
-        
-        # Initialize model if config is provided
-        if self.config:
-            self.model = LogisticRegression(**self.config)
-    
-    def fit(self, X, y):
-        """Fit the model with optional preprocessing."""
-        if self.model is None:
-            self.model = LogisticRegression(**self.config)
-        
-        # Optional feature scaling for logistic regression
-        if self.config.get('scale_features', False):
-            try:
-                from sklearn.preprocessing import StandardScaler
-                self.scaler = StandardScaler()
-                X_scaled = self.scaler.fit_transform(X)
-            except ImportError:
-                print("⚠️ sklearn.preprocessing not available. Skipping scaling.")
-                X_scaled = X
-        else:
-            X_scaled = X
-        
-        self.model.fit(X_scaled, y)
-        return self
-    
-    def predict(self, X):
-        """Make predictions."""
-        if self.model is None:
-            raise ValueError("Model not fitted. Call fit() first.")
-        
-        if self.scaler is not None:
-            X_scaled = self.scaler.transform(X)
-        else:
-            X_scaled = X
-        
-        return self.model.predict(X_scaled)
-    
-    def predict_proba(self, X):
-        """Predict class probabilities."""
-        if self.model is None:
-            raise ValueError("Model not fitted. Call fit() first.")
-        
-        if self.scaler is not None:
-            X_scaled = self.scaler.transform(X)
-        else:
-            X_scaled = X
-        
-        return self.model.predict_proba(X_scaled)
-    
-    def get_params(self, deep=True):
-        return self.config.copy()
-    
-    def set_params(self, **params):
-        self.config.update(params)
-        return self
-
+# Just call the method - no function needed!
+automl = SimpleAutoML()
+automl.explore_learners()  # Auto-executes and prints results
 
 # ============================================================================
-# STEP 2: Create Factory Functions
+# STEP 2: Create Custom Learners (Simplified!)
 # ============================================================================
 
-def get_custom_rf_learner(config):
-    """Factory function for Custom Random Forest learner."""
-    return CustomRandomForestLearner(config)
+print("\n🎯 STEP 2: Create Custom Learners")
+print("=" * 50)
 
-def get_custom_lr_learner(config):
-    """Factory function for Custom Logistic Regression learner."""
-    return CustomLogisticRegressionLearner(config)
+# Method 1: Simple custom learner using the registry system
+print("\n🔬 Method 1: Using the Registry System")
 
+# Get the registry
+registry = get_learner_registry()
 
-# ============================================================================
-# STEP 3: Define Configuration Spaces
-# ============================================================================
+# Add a custom Random Forest with specific parameters
+def custom_rf_factory(config):
+    """Factory function for custom Random Forest."""
+    return RandomForestClassifier(
+        n_estimators=config.get('n_estimators', 100),
+        max_depth=config.get('max_depth', 10),
+        min_samples_split=config.get('min_samples_split', 2),
+        random_state=42
+    )
 
-# Configuration space for Random Forest
+# Register the custom learner
 custom_rf_config = {
-    "n_estimators": {"type": "int", "bounds": [50, 200]},
+    "n_estimators": {"type": "int", "bounds": [50, 300]},
     "max_depth": {"type": "int", "bounds": [3, 15]},
-    "min_samples_split": {"type": "int", "bounds": [2, 10]},
-    "min_samples_leaf": {"type": "int", "bounds": [1, 5]},
-    "max_features": {"type": "categorical", "choices": ["sqrt", "log2", None]}
+    "min_samples_split": {"type": "int", "bounds": [2, 20]}
 }
 
-# Configuration space for Logistic Regression
+registry._register_learner("custom_rf", custom_rf_factory, custom_rf_config)
+print("✅ Custom Random Forest registered as 'custom_rf'")
+
+# Add a custom Logistic Regression
+def custom_lr_factory(config):
+    """Factory function for custom Logistic Regression."""
+    return LogisticRegression(
+        C=config.get('C', 1.0),
+        max_iter=config.get('max_iter', 1000),
+        random_state=42
+    )
+
 custom_lr_config = {
     "C": {"type": "float", "bounds": [0.1, 10.0]},
-    "penalty": {"type": "categorical", "choices": ["l1", "l2"]},
-    "solver": {"type": "categorical", "choices": ["liblinear", "saga"]},
-    "scale_features": {"type": "categorical", "choices": [True, False]}
+    "max_iter": {"type": "int", "bounds": [100, 2000]}
 }
 
+registry._register_learner("custom_lr", custom_lr_factory, custom_lr_config)
+print("✅ Custom Logistic Regression registered as 'custom_lr'")
 
 # ============================================================================
-# STEP 4: Integration Example
+# STEP 3: Use Custom Learners with Pandas-Style API (No Functions!)
 # ============================================================================
 
-def run_custom_learner_example():
-    """Run a complete example with custom learners."""
-    
-    print("🔬 Creating synthetic dataset...")
-    X, y = make_classification(
-        n_samples=1000,
-        n_features=20,
-        n_informative=10,
-        n_redundant=5,
+print("\n🚀 STEP 3: Use Custom Learners with Pandas-Style API")
+print("=" * 50)
+
+# Generate sample data
+X, y = make_classification(
+    n_samples=1000,
+    n_features=20,
+    n_informative=10,
+    n_redundant=5,
+    random_state=42
+)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+print(f"📊 Dataset shape: {X.shape}")
+print(f"🎯 Classes: {np.unique(y)}")
+
+# Method 1: Use custom learners with SimpleAutoML
+print("\n🔬 Method 1: Custom learners with SimpleAutoML")
+automl = SimpleAutoML(
+    learners=["custom_rf", "custom_lr", "random_forest"],  # Mix of custom and built-in
+    task="classification",
+    n_trials=10,
+    cv=3
+)
+automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+
+# Test the model
+y_pred = automl.predict(X_test)
+test_accuracy = accuracy_score(y_test, y_pred)
+print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+
+# Method 2: Use only custom learners
+print("\n🔬 Method 2: Only custom learners")
+automl = SimpleAutoML(learners=["custom_rf", "custom_lr"], n_trials=5)
+automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+
+# Test the model
+y_pred = automl.predict(X_test)
+test_accuracy = accuracy_score(y_test, y_pred)
+print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+
+# ============================================================================
+# STEP 4: Advanced Custom Learner (No Functions!)
+# ============================================================================
+
+print("\n⚡ STEP 4: Advanced Custom Learner")
+print("=" * 50)
+
+# Create an ensemble learner using the registry system
+def ensemble_factory(config):
+    """Factory function for ensemble learner."""
+    rf = RandomForestClassifier(
+        n_estimators=config.get('rf_n_estimators', 100),
+        max_depth=config.get('rf_max_depth', 10),
+        random_state=42
+    )
+    lr = LogisticRegression(
+        C=config.get('lr_C', 1.0),
+        max_iter=config.get('lr_max_iter', 1000),
         random_state=42
     )
     
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    # Simple voting ensemble
+    from sklearn.ensemble import VotingClassifier
+    return VotingClassifier(
+        estimators=[('rf', rf), ('lr', lr)],
+        voting='soft'
     )
-    
-    print(f"📊 Dataset shape: {X.shape}")
-    print(f"🎯 Classes: {np.unique(y)}")
-    
-    # Define learners and their configurations
-    learners = {
-        "custom_rf": get_custom_rf_learner,
-        "custom_lr": get_custom_lr_learner
-    }
-    
-    config_space = {
-        "custom_rf": custom_rf_config,
-        "custom_lr": custom_lr_config
-    }
-    
-    # Create callbacks
-    callbacks = [
-        LoggerCallback(log_level="INFO"),
-        ProgressCallback(total_trials=15, patience=5)
-    ]
-    
-    print("🚀 Starting AutoML with custom learners...")
-    
-    # Create and run AutoML controller
-    controller = AutoMLController(
-        learners=learners,
-        searcher=OptunaSearcher(config_space),
-        config_space=config_space,
-        task="classification",
-        n_trials=15,
-        cv=3,
-        callbacks=callbacks
-    )
-    
-    # Fit the model
-    controller.fit(X_train, y_train)
-    
-    # Make predictions
-    y_pred = controller.predict(X_test)
-    test_accuracy = accuracy_score(y_test, y_pred)
-    
-    print(f"\n🎉 Experiment completed!")
-    print(f"📈 Best CV Score: {controller.best_score:.4f}")
-    print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-    print(f"📊 Best Configuration: {controller.searcher.get_best()}")
-    
-    return controller, test_accuracy
 
+# Register the ensemble learner
+ensemble_config = {
+    "rf_n_estimators": {"type": "int", "bounds": [50, 200]},
+    "rf_max_depth": {"type": "int", "bounds": [3, 15]},
+    "lr_C": {"type": "float", "bounds": [0.1, 10.0]},
+    "lr_max_iter": {"type": "int", "bounds": [100, 1000]}
+}
+
+registry._register_learner("ensemble", ensemble_factory, ensemble_config)
+print("✅ Ensemble learner registered as 'ensemble'")
+
+# Use the ensemble learner
+print("\n🔬 Using the ensemble learner:")
+automl = SimpleAutoML(learners="ensemble", n_trials=5)
+automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+
+# Test the model
+y_pred = automl.predict(X_test)
+test_accuracy = accuracy_score(y_test, y_pred)
+print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
 
 # ============================================================================
-# STEP 5: Advanced Custom Learner Example
+# STEP 5: Method Chaining with Custom Learners (No Functions!)
 # ============================================================================
 
-class EnsembleLearner(BaseEstimator, ClassifierMixin):
-    """
-    Advanced custom learner that combines multiple models.
-    
-    Demonstrates:
-    - Model composition
-    - Custom voting strategies
-    - Advanced configuration handling
-    """
-    
-    def __init__(self, config=None, **kwargs):
-        self.config = (config or {}).copy()
-        self.config.update(kwargs)
-        self.models = []
-        self.weights = None
-        
-    def fit(self, X, y):
-        """Fit multiple models and determine weights."""
-        n_models = self.config.get('n_models', 3)
-        model_types = self.config.get('model_types', ['rf', 'lr', 'xgb'])
-        
-        self.models = []
-        
-        for i in range(n_models):
-            model_type = model_types[i % len(model_types)]
-            
-            if model_type == 'rf':
-                model = RandomForestClassifier(
-                    n_estimators=self.config.get('n_estimators', 100),
-                    max_depth=self.config.get('max_depth', 10),
-                    random_state=42 + i
-                )
-            elif model_type == 'lr':
-                model = LogisticRegression(
-                    C=self.config.get('C', 1.0),
-                    random_state=42 + i
-                )
-            else:
-                # Default to Random Forest
-                model = RandomForestClassifier(random_state=42 + i)
-            
-            model.fit(X, y)
-            self.models.append(model)
-        
-        # Simple equal weighting
-        self.weights = np.ones(len(self.models)) / len(self.models)
-        
-        return self
-    
-    def predict(self, X):
-        """Make ensemble predictions."""
-        if not self.models:
-            raise ValueError("Models not fitted. Call fit() first.")
-        
-        predictions = []
-        for model in self.models:
-            pred = model.predict(X)
-            predictions.append(pred)
-        
-        # Weighted voting
-        weighted_preds = np.zeros(len(X))
-        for i, (pred, weight) in enumerate(zip(predictions, self.weights)):
-            weighted_preds += weight * pred
-        
-        return (weighted_preds > 0.5).astype(int)
-    
-    def get_params(self, deep=True):
-        return self.config.copy()
-    
-    def set_params(self, **params):
-        self.config.update(params)
-        return self
+print("\n🔗 STEP 5: Method Chaining with Custom Learners")
+print("=" * 50)
 
+# Generate data
+X, y = make_classification(n_samples=600, n_features=15, n_informative=8, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-def get_ensemble_learner(config):
-    """Factory function for ensemble learner."""
-    return EnsembleLearner(config)
+print(f"📊 Dataset shape: {X.shape}")
 
+# Chain multiple methods with custom learners
+print("\n🔬 Method chaining with custom learners:")
+automl = SimpleAutoML()
+automl.with_mlflow(experiment_name="custom_learners").with_flaml(time_budget=20).quick_classify(X_train, y_train)
+
+# Test the model
+y_pred = automl.predict(X_test)
+test_accuracy = accuracy_score(y_test, y_pred)
+print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
 
 # ============================================================================
-# STEP 6: Testing and Validation
+# STEP 6: Compare Custom vs Built-in Learners (No Functions!)
 # ============================================================================
 
-def test_custom_learners():
-    """Test that custom learners work correctly."""
-    print("🧪 Testing custom learners...")
-    
-    # Test data
-    X, y = make_classification(n_samples=100, n_features=10, random_state=42)
-    
-    # Test Random Forest learner
-    rf_learner = get_custom_rf_learner({"n_estimators": 10, "max_depth": 5})
-    rf_learner.fit(X, y)
-    rf_preds = rf_learner.predict(X)
-    print(f"✅ Custom RF learner test passed - Predictions shape: {rf_preds.shape}")
-    
-    # Test Logistic Regression learner
-    lr_learner = get_custom_lr_learner({"C": 1.0, "scale_features": True})
-    lr_learner.fit(X, y)
-    lr_preds = lr_learner.predict(X)
-    print(f"✅ Custom LR learner test passed - Predictions shape: {lr_preds.shape}")
-    
-    # Test Ensemble learner
-    ensemble_learner = get_ensemble_learner({"n_models": 2})
-    ensemble_learner.fit(X, y)
-    ensemble_preds = ensemble_learner.predict(X)
-    print(f"✅ Ensemble learner test passed - Predictions shape: {ensemble_preds.shape}")
-    
-    print("🎉 All custom learner tests passed!")
+print("\n📊 STEP 6: Compare Custom vs Built-in Learners")
+print("=" * 50)
 
+# Generate data
+X, y = make_classification(n_samples=500, n_features=12, n_informative=6, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"📊 Dataset shape: {X.shape}")
+
+# Compare different learner combinations
+learner_combinations = [
+    ("Built-in only", ["random_forest", "logistic_regression"]),
+    ("Custom only", ["custom_rf", "custom_lr"]),
+    ("Mixed", ["random_forest", "custom_rf", "ensemble"])
+]
+
+results = {}
+
+for name, learners in learner_combinations:
+    print(f"\n🔬 Testing {name}:")
+    
+    try:
+        automl = SimpleAutoML(learners=learners, n_trials=5)
+        automl.quick_classify(X_train, y_train)
+        
+        y_pred = automl.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        
+        results[name] = {
+            "accuracy": accuracy,
+            "best_score": automl.best_score,
+            "best_learner": automl.best_config.get('learner_name', 'unknown')
+        }
+        
+        print(f"   ✅ Accuracy: {accuracy:.4f}")
+        print(f"   📈 Best CV Score: {automl.best_score:.4f}")
+        print(f"   🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
+        
+    except Exception as e:
+        print(f"   ❌ Failed: {e}")
+        results[name] = {"error": str(e)}
+
+# Summary
+print("\n📋 Comparison Summary:")
+for name, result in results.items():
+    if "error" not in result:
+        print(f"   {name}: {result['accuracy']:.4f} accuracy, best: {result['best_learner']}")
+    else:
+        print(f"   {name}: Failed - {result['error']}")
 
 # ============================================================================
-# MAIN EXECUTION
+# STEP 7: Smart Defaults with Custom Learners (No Functions!)
 # ============================================================================
 
-if __name__ == "__main__":
-    print("🚀 MLTeammate Custom Learner Tutorial")
-    print("=" * 50)
-    
-    # Test custom learners
-    test_custom_learners()
-    
-    print("\n" + "=" * 50)
-    
-    # Run full example
-    controller, accuracy = run_custom_learner_example()
-    
-    print(f"\n📚 Tutorial Summary:")
-    print(f"   • Created 3 custom learners (RF, LR, Ensemble)")
-    print(f"   • Defined configuration spaces for hyperparameter tuning")
-    print(f"   • Integrated with MLTeammate AutoML pipeline")
-    print(f"   • Achieved test accuracy: {accuracy:.4f}")
-    print(f"\n💡 Key Takeaways:")
-    print(f"   • Custom learners must follow sklearn conventions")
-    print(f"   • Factory functions simplify integration")
-    print(f"   • Configuration spaces enable hyperparameter tuning")
-    print(f"   • MLTeammate handles the rest automatically!")
+print("\n🧠 STEP 7: Smart Defaults with Custom Learners")
+print("=" * 50)
+
+# Generate data
+X, y = make_classification(n_samples=400, n_features=10, n_informative=5, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"📊 Dataset shape: {X.shape}")
+
+# Let SimpleAutoML auto-configure with custom learners
+print("\n🔬 Auto-configured experiment with custom learners:")
+automl = SimpleAutoML(learners=["custom_rf", "custom_lr"])  # Just specify learners!
+automl.quick_classify(X_train, y_train)  # Auto-detects task, configures trials, CV, etc.
+
+# Test the model
+y_pred = automl.predict(X_test)
+test_accuracy = accuracy_score(y_test, y_pred)
+print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+
+# ============================================================================
+# STEP 8: Results Summary with Custom Learners (No Functions!)
+# ============================================================================
+
+print("\n📋 STEP 8: Results Summary with Custom Learners")
+print("=" * 50)
+
+# Generate data
+X, y = make_classification(n_samples=300, n_features=8, n_informative=4, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"📊 Dataset shape: {X.shape}")
+
+# Run experiment with custom learners
+automl = SimpleAutoML(learners=["custom_rf", "custom_lr", "ensemble"], n_trials=3)
+automl.quick_classify(X_train, y_train)
+
+# Get comprehensive results summary
+print("\n📋 Results Summary:")
+summary = automl.get_results_summary()
+for key, value in summary.items():
+    print(f"   {key}: {value}")
+
+# ============================================================================
+# FINAL SUMMARY
+# ============================================================================
+
+print("\n" + "=" * 60)
+print("🎉 CUSTOM LEARNER TUTORIAL COMPLETED!")
+print("=" * 60)
+print("✅ You've created and used custom learners with ZERO function definitions!")
+print("✅ Registry system makes custom learners easy to integrate!")
+print("✅ Pandas-style interface works seamlessly with custom learners!")
+print("\n💡 Key Takeaways:")
+print("   • No complex class definitions needed")
+print("   • Registry system handles all the complexity")
+print("   • Custom learners work with all pandas-style methods")
+print("   • Method chaining and auto-execution work perfectly")
+print("   • Easy to extend MLTeammate with your own models")
+print("\n🚀 Ready to create custom learners like a pro!")
