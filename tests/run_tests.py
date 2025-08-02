@@ -92,14 +92,35 @@ class TestRunner:
                 
                 # Parse test results
                 if result["success"]:
-                    # Count passed tests
+                    # Parse pytest output properly
                     lines = result["stdout"].split('\n')
                     for line in lines:
-                        if "passed" in line and "failed" not in line:
-                            passed_tests += 1
-                        elif "failed" in line:
-                            failed_tests += 1
-                        total_tests += 1
+                        # Look for lines like "test_name.py::TestClass::test_method PASSED"
+                        if "::" in line and ("PASSED" in line or "FAILED" in line or "ERROR" in line):
+                            total_tests += 1
+                            if "PASSED" in line:
+                                passed_tests += 1
+                            elif "FAILED" in line or "ERROR" in line:
+                                failed_tests += 1
+                        # Also look for summary lines like "= 5 passed, 1 failed in 2.34s ="
+                        elif "passed" in line and ("failed" in line or "error" in line):
+                            # Extract numbers from summary
+                            import re
+                            passed_match = re.search(r'(\d+) passed', line)
+                            failed_match = re.search(r'(\d+) failed', line)
+                            error_match = re.search(r'(\d+) error', line)
+                            
+                            if passed_match and not total_tests:  # Only use summary if we haven't counted individual tests
+                                passed_tests = int(passed_match.group(1))
+                                total_tests += passed_tests
+                            
+                            if failed_match:
+                                failed_tests = int(failed_match.group(1))
+                                total_tests += failed_tests
+                            
+                            if error_match:
+                                failed_tests += int(error_match.group(1))
+                                total_tests += int(error_match.group(1))
                 
                 results[test_file] = result
             else:
@@ -136,11 +157,32 @@ class TestRunner:
             if result["success"]:
                 lines = result["stdout"].split('\n')
                 for line in lines:
-                    if "passed" in line and "failed" not in line:
-                        passed_tests += 1
-                    elif "failed" in line:
-                        failed_tests += 1
-                    total_tests += 1
+                    # Look for lines like "test_name.py::TestClass::test_method PASSED"
+                    if "::" in line and ("PASSED" in line or "FAILED" in line or "ERROR" in line):
+                        total_tests += 1
+                        if "PASSED" in line:
+                            passed_tests += 1
+                        elif "FAILED" in line or "ERROR" in line:
+                            failed_tests += 1
+                    # Also look for summary lines like "= 5 passed, 1 failed in 2.34s ="
+                    elif "passed" in line and ("failed" in line or "error" in line):
+                        # Extract numbers from summary
+                        import re
+                        passed_match = re.search(r'(\d+) passed', line)
+                        failed_match = re.search(r'(\d+) failed', line)
+                        error_match = re.search(r'(\d+) error', line)
+                        
+                        if passed_match and not total_tests:  # Only use summary if we haven't counted individual tests
+                            passed_tests = int(passed_match.group(1))
+                            total_tests += passed_tests
+                        
+                        if failed_match:
+                            failed_tests = int(failed_match.group(1))
+                            total_tests += failed_tests
+                        
+                        if error_match:
+                            failed_tests += int(error_match.group(1))
+                            total_tests += int(error_match.group(1))
             
             return {
                 "result": result,
@@ -199,11 +241,32 @@ class TestRunner:
             if result["success"]:
                 lines = result["stdout"].split('\n')
                 for line in lines:
-                    if "passed" in line and "failed" not in line:
-                        passed_tests += 1
-                    elif "failed" in line:
-                        failed_tests += 1
-                    total_tests += 1
+                    # Look for lines like "test_name.py::TestClass::test_method PASSED"
+                    if "::" in line and ("PASSED" in line or "FAILED" in line or "ERROR" in line):
+                        total_tests += 1
+                        if "PASSED" in line:
+                            passed_tests += 1
+                        elif "FAILED" in line or "ERROR" in line:
+                            failed_tests += 1
+                    # Also look for summary lines like "= 5 passed, 1 failed in 2.34s ="
+                    elif "passed" in line and ("failed" in line or "error" in line):
+                        # Extract numbers from summary
+                        import re
+                        passed_match = re.search(r'(\d+) passed', line)
+                        failed_match = re.search(r'(\d+) failed', line)
+                        error_match = re.search(r'(\d+) error', line)
+                        
+                        if passed_match and not total_tests:  # Only use summary if we haven't counted individual tests
+                            passed_tests = int(passed_match.group(1))
+                            total_tests += passed_tests
+                        
+                        if failed_match:
+                            failed_tests = int(failed_match.group(1))
+                            total_tests += failed_tests
+                        
+                        if error_match:
+                            failed_tests += int(error_match.group(1))
+                            total_tests += int(error_match.group(1))
             
             return {
                 "result": result,

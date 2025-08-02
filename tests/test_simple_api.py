@@ -18,6 +18,10 @@ from ml_teammate.interface.simple_api import (
     list_available_learners,
     get_learner_info
 )
+from ml_teammate.learners.registry import (
+    get_classification_learners,
+    get_regression_learners
+)
 
 
 class TestSimpleAPI:
