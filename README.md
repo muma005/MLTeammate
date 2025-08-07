@@ -275,7 +275,7 @@ Feel free to fork, star ⭐, and share feedback.
 
 ## ✅ Alternative Install Options
 
-Once your repo is public on GitHub, users can install it directly using:
+ users can install it directly using:
 
 ```bash
 pip install git+https://github.com/yourusername/ml_teammate.git
@@ -283,7 +283,6 @@ pip install git+https://github.com/yourusername/ml_teammate.git
 
 This avoids the need to clone and works well for clean installs.
 
-You can even add a `setup.py` or `pyproject.toml` (optional) to register it on PyPI later if you want `pip install mlteammate`.
 
 ---
 
