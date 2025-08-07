@@ -273,15 +273,36 @@ Feel free to fork, star ⭐, and share feedback.
 
 ---
 
-## ✅ Alternative Install Options
+### ✅ **Direct GitHub Installation**
 
- users can install it directly using:
+you can install MLTeammate directly from GitHub using:
 
 ```bash
-pip install git+https://github.com/yourusername/ml_teammate.git
-````
+pip install git+https://github.com/muma005/MLTeammate.git
+```
 
-This avoids the need to clone and works well for clean installs.
+**This works immediately and includes:**
+- ✅ All latest features and fixes
+- ✅ No need to clone the repository  
+- ✅ Automatic dependency installation
+- ✅ Works in any Python environment
+
+### **Alternative Installation Methods:**
+
+```bash
+# Install from specific branch
+pip install git+https://github.com/muma005/MLTeammate.git@main
+
+# Install in development mode (for contributors)
+git clone https://github.com/muma005/MLTeammate.git
+cd MLTeammate
+pip install -e .
+
+# Future PyPI installation (coming soon!)
+pip install ml-teammate
+```
+
+---
 
 
 ---
