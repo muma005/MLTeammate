@@ -1,0 +1,222 @@
+# MLTeammate AutoML Configuration
+# Default settings for experiments, benchmarking, and AutoML workflows
+
+# AutoML Controller Settings
+automl:
+  default_task: "classification"
+  default_n_trials: 20
+  default_searcher: "random"
+  default_cv_folds: 5
+  default_random_state: 42
+  default_log_level: "INFO"
+  
+  # Default learners for each task
+  default_learners:
+    classification:
+      - "logistic_regression"
+      - "random_forest_clf"
+      - "xgboost_clf"
+      - "lightgbm_clf"
+    regression:
+      - "linear_regression"
+      - "random_forest_reg"
+      - "xgboost_reg"
+      - "lightgbm_reg"
+
+# Search Algorithm Settings
+search:
+  random:
+    strategy: "uniform"
+    
+  optuna:
+    n_startup_trials: 10
+    n_warmup_steps: 5
+    sampler: "TPESampler"
+    pruner: "MedianPruner"
+    
+  flaml:
+    time_budget: 60
+    metric: "auto"
+    estimator_list: "auto"
+
+# Data Processing Settings
+data_processing:
+  preprocessing:
+    handle_missing: true
+    scale_features: true
+    encode_categories: true
+    remove_duplicates: true
+    
+  validation:
+    check_shape: true
+    check_types: true
+    check_missing: true
+    min_samples: 10
+    max_features: 10000
+    
+  resampling:
+    strategy: "auto"  # "oversample", "undersample", "auto", "none"
+    threshold: 0.1    # Imbalance ratio threshold
+    
+  overfitting:
+    enable_monitoring: true
+    patience: 5
+    min_delta: 0.001
+
+# Experiment Settings
+experiments:
+  output_dir: "./mlteammate_experiments"
+  save_models: true
+  save_predictions: true
+  save_artifacts: true
+  
+  # MLflow settings
+  mlflow:
+    tracking_uri: "file:./mlruns"
+    experiment_name: "mlteammate_automl"
+    enable_autolog: false
+    log_models: true
+    log_artifacts: true
+
+# Benchmark Settings
+benchmarking:
+  output_dir: "./benchmark_results"
+  
+  # Default benchmark datasets
+  classification_datasets:
+    - "synthetic_easy"
+    - "synthetic_hard"
+    - "wine"
+    - "digits_small"
+    
+  regression_datasets:
+    - "synthetic_linear"
+    - "synthetic_nonlinear"
+    
+  # Benchmark parameters
+  default_n_trials: 10
+  default_searchers:
+    - "random"
+    - "optuna"
+    
+  statistical_tests:
+    enable: true
+    alpha: 0.05
+    test_type: "wilcoxon"
+
+# Logging Settings
+logging:
+  default_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  
+  # File logging
+  enable_file_logging: false
+  log_file: "./mlteammate.log"
+  max_file_size: "10MB"
+  backup_count: 3
+
+# Performance Settings
+performance:
+  # Memory management
+  max_memory_usage: "8GB"
+  enable_garbage_collection: true
+  
+  # Parallel processing
+  n_jobs: -1  # Use all available cores
+  enable_parallel_search: true
+  
+  # Caching
+  enable_caching: true
+  cache_dir: "./mlteammate_cache"
+  cache_size_limit: "1GB"
+
+# Validation Settings
+validation:
+  # Cross-validation defaults
+  cv_folds: 5
+  cv_strategy: "stratified"  # For classification
+  cv_shuffle: true
+  
+  # Train/validation split
+  validation_size: 0.2
+  stratify: true
+
+# Callback Settings
+callbacks:
+  default_callbacks:
+    - "logger"
+    - "progress"
+    
+  # Progress callback settings
+  progress:
+    enable_tqdm: true
+    update_frequency: 1  # Update every N trials
+    
+  # Logger callback settings
+  logger:
+    log_level: "INFO"
+    log_frequency: 1
+    
+  # MLflow callback settings
+  mlflow:
+    enable: false
+    experiment_name: "auto"
+    log_params: true
+    log_metrics: true
+    log_artifacts: true
+
+# Feature Engineering Settings
+feature_engineering:
+  enable_auto_features: false
+  
+  # Polynomial features
+  polynomial:
+    degree: 2
+    interaction_only: false
+    
+  # Feature selection
+  selection:
+    enable: false
+    method: "mutual_info"
+    k_best: 10
+
+# Model Selection Settings
+model_selection:
+  # Ensemble methods
+  enable_ensembles: false
+  ensemble_methods:
+    - "voting"
+    - "stacking"
+    
+  # Model validation
+  cross_validate_final: true
+  refit_best_model: true
+
+# Resource Limits
+limits:
+  max_trial_time: 300  # seconds
+  max_experiment_time: 3600  # seconds
+  max_memory_per_trial: "2GB"
+  
+# Error Handling
+error_handling:
+  continue_on_trial_error: true
+  max_consecutive_failures: 5
+  retry_failed_trials: false
+  
+# Output Settings
+output:
+  # Result formats
+  save_json: true
+  save_csv: true
+  save_pickle: false
+  
+  # Plots and visualizations
+  generate_plots: true
+  plot_formats: ["png", "pdf"]
+  plot_dpi: 300
+  
+  # Verbosity
+  verbose_results: true
+  include_intermediate_results: false

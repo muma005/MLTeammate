@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/ADMIN/Desktop/MLTeammate-1/mlruns/978344206655584946/models/m-ea34f60b109444c3ac37f11e44c73dd0/artifacts
+creation_timestamp: 1754559200169
+experiment_id: '978344206655584946'
+last_updated_timestamp: 1754559209109
+model_id: m-ea34f60b109444c3ac37f11e44c73dd0
+model_type: null
+name: best_model
+source_run_id: 5d037cf663d64fcba456c2dd1037fa7d
+status: 2
+status_message: null

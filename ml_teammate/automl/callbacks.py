@@ -1,360 +1,617 @@
-# ml_teammate/automl/callbacks.py
 """
-Enhanced callback system for MLTeammate.
-Provides flexible logging, monitoring, and artifact management capabilities.
+Phase 5: Callback System for MLTeammate AutoML Controller
+
+Modern, flexible callback system for experiment monitoring, logging, and artifact management.
+Provides hooks into the AutoML experiment lifecycle with built-in MLflow integration.
+
+This module provides:
+- Abstract base callback interface
+- MLflow experiment tracking
+- Progress monitoring and logging
+- Artifact management
+- Performance visualization
+- Custom callback extensibility
 """
 
-import time
-import json
 import os
-from typing import Dict, Any, Optional
-from datetime import datetime
+import json
+import time
+import pickle
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List, Optional, Union
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
 
-class BaseCallback:
-    """Base class for all callbacks in MLTeammate."""
+# Import our frozen Phase 1 utilities
+from ml_teammate.utils import get_logger
+
+
+class BaseCallback(ABC):
+    """
+    Abstract base class for AutoML experiment callbacks.
     
-    def on_trial_start(self, trial_id: str, config: dict) -> None:
-        """Called when a trial starts."""
+    Callbacks provide hooks into the AutoML experiment lifecycle:
+    - on_experiment_start: Called when experiment begins
+    - on_trial_start: Called before each trial
+    - on_trial_end: Called after each trial
+    - on_experiment_end: Called when experiment completes
+    """
+    
+    def __init__(self, name: Optional[str] = None):
+        """Initialize callback with optional name."""
+        self.name = name or self.__class__.__name__
+        self.logger = get_logger(f"Callback.{self.name}")
+    
+    def on_experiment_start(self, experiment_config: Dict[str, Any]):
+        """Called when AutoML experiment starts."""
         pass
     
-    def on_trial_end(self, trial_id: str, config: dict, score: float, is_best: bool) -> None:
-        """Called when a trial ends."""
+    def on_trial_start(self, trial_id: str, config: Dict[str, Any]):
+        """Called before each trial starts."""
         pass
     
-    def on_experiment_start(self, experiment_config: dict) -> None:
-        """Called when the experiment starts."""
+    def on_trial_end(self, trial_id: str, config: Dict[str, Any], 
+                     score: float, is_best: bool):
+        """Called after each trial completes."""
         pass
     
-    def on_experiment_end(self, best_score: float, best_config: dict) -> None:
-        """Called when the experiment ends."""
+    def on_experiment_end(self, results: Dict[str, Any]):
+        """Called when AutoML experiment completes."""
         pass
 
 
 class LoggerCallback(BaseCallback):
     """
-    Enhanced logging callback with structured output and optional MLflow integration.
+    Comprehensive logging callback with configurable verbosity.
     
-    Features:
-    - Structured logging with timestamps
-    - Configurable log levels
-    - Optional MLflow integration with nested runs
-    - Trial progress tracking
-    - Best model highlighting
+    Provides detailed experiment logging with progress tracking,
+    performance summaries, and configurable output formats.
     """
     
-    def __init__(self, 
-                 use_mlflow: bool = False,
-                 log_level: str = "INFO",
-                 log_file: Optional[str] = None,
-                 experiment_name: str = "mlteammate_experiment"):
+    def __init__(self, log_level: str = "INFO", log_trials: bool = True,
+                 log_progress_interval: int = 5):
         """
-        Initialize the logger callback.
+        Initialize logger callback.
         
         Args:
-            use_mlflow: Whether to enable MLflow logging
-            log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-            log_file: Optional file path for logging
-            experiment_name: Name for MLflow experiment
+            log_level: Logging level
+            log_trials: Whether to log individual trials
+            log_progress_interval: Log progress every N trials
         """
-        self.use_mlflow = use_mlflow
-        self.log_level = log_level.upper()
-        self.log_file = log_file
-        self.experiment_name = experiment_name
-        self.trial_count = 0
-        self.start_time = None
+        super().__init__("Logger")
+        self.log_trials = log_trials
+        self.log_progress_interval = log_progress_interval
+        self.logger = get_logger("AutoML.Logger", log_level)
         
-        # Initialize MLflow if requested
-        if use_mlflow:
-            try:
-                from ml_teammate.experiments.mlflow_helper import MLflowHelper
-                self.mlflow = MLflowHelper(experiment_name)
-            except ImportError:
-                print("⚠️ MLflow not available. Continuing without MLflow logging.")
-                self.use_mlflow = False
-                self.mlflow = None
-        else:
-            self.mlflow = None
+        # State tracking
+        self.start_time = None
+        self.trial_count = 0
+        self.best_score = None
+        self.score_history = []
     
-    def _log(self, message: str, level: str = "INFO") -> None:
-        """Internal logging method with level filtering."""
-        if self._should_log(level):
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            formatted_message = f"[{timestamp}] [{level}] {message}"
-            print(formatted_message)
-            
-            if self.log_file:
-                with open(self.log_file, 'a') as f:
-                    f.write(formatted_message + '\n')
-    
-    def _should_log(self, level: str) -> bool:
-        """Check if message should be logged based on log level."""
-        levels = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3}
-        return levels.get(level, 1) >= levels.get(self.log_level, 1)
-    
-    def on_experiment_start(self, experiment_config: dict) -> None:
+    def on_experiment_start(self, experiment_config: Dict[str, Any]):
         """Log experiment start with configuration."""
         self.start_time = time.time()
-        self._log(f"🚀 Starting MLTeammate experiment: {self.experiment_name}")
-        self._log(f"📋 Experiment config: {json.dumps(experiment_config, indent=2)}")
-        
-        if self.use_mlflow and self.mlflow:
-            try:
-                # Start the main experiment run
-                self.mlflow.start_experiment(experiment_config=experiment_config)
-                self._log("✅ MLflow experiment started with nested runs support")
-            except Exception as e:
-                self._log(f"❌ Failed to start MLflow experiment: {e}", "ERROR")
-    
-    def on_trial_start(self, trial_id: str, config: dict) -> None:
-        """Log trial start with configuration."""
-        self.trial_count += 1
-        self._log(f"🔬 Starting trial {self.trial_count} (ID: {trial_id[:8]}...)")
-        self._log(f"⚙️  Config: {json.dumps(config, indent=2)}")
-        
-        if self.use_mlflow and self.mlflow:
-            try:
-                # Start nested trial run
-                self.mlflow.start_trial(trial_id, self.trial_count, config)
-                self._log(f"✅ MLflow trial {self.trial_count} started")
-            except Exception as e:
-                self._log(f"❌ Failed to start MLflow trial: {e}", "ERROR")
-    
-    def on_trial_end(self, trial_id: str, config: dict, score: float, is_best: bool) -> None:
-        """Log trial results with enhanced formatting."""
-        duration = time.time() - self.start_time if self.start_time else 0
-        
-        # Format the log message
-        status_icon = "🏆" if is_best else "📊"
-        best_indicator = " (NEW BEST!)" if is_best else ""
-        
-        self._log(f"{status_icon} Trial {self.trial_count} completed - Score: {score:.4f}{best_indicator}")
-        self._log(f"⏱️  Duration: {duration:.2f}s")
-        
-        # Log to MLflow if enabled
-        if self.use_mlflow and self.mlflow:
-            try:
-                # Log trial metrics
-                trial_metrics = {
-                    "score": score,
-                    "trial_number": self.trial_count,
-                    "is_best": is_best
-                }
-                self.mlflow.log_trial_metrics(trial_metrics)
-                
-                # End the trial run
-                self.mlflow.end_trial()
-                self._log(f"✅ MLflow trial {self.trial_count} completed")
-            except Exception as e:
-                self._log(f"❌ MLflow logging failed: {e}", "ERROR")
-    
-    def on_experiment_end(self, best_score: float, best_config: dict) -> None:
-        """Log experiment completion with summary."""
-        total_duration = time.time() - self.start_time if self.start_time else 0
-        
-        self._log("🎉 Experiment completed!")
-        self._log(f"📈 Best score: {best_score:.4f}")
-        self._log(f"⚙️  Best config: {json.dumps(best_config, indent=2)}")
-        self._log(f"⏱️  Total duration: {total_duration:.2f}s")
-        self._log(f"🔬 Total trials: {self.trial_count}")
-        
-        if self.use_mlflow and self.mlflow:
-            try:
-                # Log experiment summary
-                self.mlflow.log_experiment_summary(
-                    best_score=best_score,
-                    best_config=best_config,
-                    total_trials=self.trial_count,
-                    experiment_duration=total_duration
-                )
-                
-                # End the experiment
-                self.mlflow.end_experiment()
-                self._log("✅ MLflow experiment completed")
-            except Exception as e:
-                self._log(f"❌ Failed to end MLflow experiment: {e}", "ERROR")
-
-
-class ProgressCallback(BaseCallback):
-    """
-    Progress tracking callback for real-time experiment monitoring.
-    
-    Features:
-    - Progress bars and percentage completion
-    - ETA calculations
-    - Performance trend analysis
-    - Early stopping suggestions
-    """
-    
-    def __init__(self, total_trials: int, patience: int = 5):
-        """
-        Initialize progress callback.
-        
-        Args:
-            total_trials: Total number of trials to run
-            patience: Number of trials without improvement before suggesting early stopping
-        """
-        self.total_trials = total_trials
-        self.patience = patience
-        self.completed_trials = 0
+        self.trial_count = 0
         self.best_score = None
-        self.trials_since_improvement = 0
-        self.start_time = None
+        self.score_history = []
+        
+        self.logger.info("=" * 60)
+        self.logger.info("MLTeammate AutoML Experiment Started")
+        self.logger.info("=" * 60)
+        self.logger.info(f"Task: {experiment_config['task']}")
+        self.logger.info(f"Learners: {experiment_config['learner_names']}")
+        self.logger.info(f"Search: {experiment_config['searcher_type']}")
+        self.logger.info(f"Trials: {experiment_config['n_trials']}")
+        self.logger.info(f"Data: {experiment_config['data_shape']}")
+        
+        if experiment_config.get('cv_folds'):
+            self.logger.info(f"Cross-validation: {experiment_config['cv_folds']} folds")
+        
+        self.logger.info("-" * 60)
     
-    def on_experiment_start(self, experiment_config: dict) -> None:
-        """Initialize progress tracking."""
-        self.start_time = time.time()
-        print(f"🎯 Progress tracking enabled for {self.total_trials} trials")
+    def on_trial_start(self, trial_id: str, config: Dict[str, Any]):
+        """Log trial start."""
+        if self.log_trials:
+            learner = config.get('learner_name', 'unknown')
+            self.logger.debug(f"Trial {self.trial_count + 1}: Starting {learner}")
     
-    def on_trial_end(self, trial_id: str, config: dict, score: float, is_best: bool) -> None:
-        """Update progress and show status."""
-        self.completed_trials += 1
+    def on_trial_end(self, trial_id: str, config: Dict[str, Any], 
+                     score: float, is_best: bool):
+        """Log trial completion."""
+        self.trial_count += 1
+        self.score_history.append(score)
         
         if is_best:
             self.best_score = score
-            self.trials_since_improvement = 0
-        else:
-            self.trials_since_improvement += 1
         
-        # Calculate progress
-        progress = (self.completed_trials / self.total_trials) * 100
-        eta = self._calculate_eta()
+        # Log individual trial
+        if self.log_trials:
+            learner = config.get('learner_name', 'unknown')
+            best_indicator = " ★ NEW BEST" if is_best else ""
+            self.logger.info(f"Trial {self.trial_count}: {learner} -> {score:.4f}{best_indicator}")
         
-        # Show progress bar
-        bar_length = 30
-        filled_length = int(bar_length * self.completed_trials // self.total_trials)
-        bar = '█' * filled_length + '-' * (bar_length - filled_length)
-        
-        print(f"\r📊 Progress: [{bar}] {progress:.1f}% ({self.completed_trials}/{self.total_trials}) "
-              f"| Best: {self.best_score:.4f} | ETA: {eta}", end='')
-        
-        # Suggest early stopping if no improvement
-        if self.trials_since_improvement >= self.patience:
-            print(f"\n⚠️  No improvement for {self.patience} trials. Consider early stopping.")
+        # Log progress summary
+        if self.trial_count % self.log_progress_interval == 0:
+            self._log_progress_summary()
     
-    def _calculate_eta(self) -> str:
-        """Calculate estimated time to completion."""
-        if self.completed_trials == 0:
-            return "Unknown"
+    def on_experiment_end(self, results: Dict[str, Any]):
+        """Log experiment completion summary."""
+        duration = time.time() - self.start_time
         
-        elapsed = time.time() - self.start_time
-        avg_time_per_trial = elapsed / self.completed_trials
-        remaining_trials = self.total_trials - self.completed_trials
-        eta_seconds = avg_time_per_trial * remaining_trials
+        self.logger.info("-" * 60)
+        self.logger.info("AutoML Experiment Completed")
+        self.logger.info("-" * 60)
         
-        if eta_seconds < 60:
-            return f"{eta_seconds:.0f}s"
-        elif eta_seconds < 3600:
-            return f"{eta_seconds/60:.1f}m"
-        else:
-            return f"{eta_seconds/3600:.1f}h"
+        exp_info = results.get("experiment_info", {})
+        self.logger.info(f"Duration: {duration:.2f}s")
+        self.logger.info(f"Trials completed: {self.trial_count}")
+        self.logger.info(f"Success rate: {exp_info.get('success_rate', 0):.1%}")
+        
+        if results.get("best_score") is not None:
+            self.logger.info(f"Best score: {results['best_score']:.4f}")
+            self.logger.info(f"Best learner: {exp_info.get('best_learner', 'unknown')}")
+            
+            if exp_info.get('score_improvement'):
+                improvement = exp_info['score_improvement']
+                self.logger.info(f"Score improvement: +{improvement:.4f}")
+        
+        self.logger.info("=" * 60)
     
-    def on_experiment_end(self, best_score: float, best_config: dict) -> None:
-        """Show final progress summary."""
-        total_duration = time.time() - self.start_time
-        print(f"\n✅ Experiment completed in {total_duration:.2f}s")
+    def _log_progress_summary(self):
+        """Log progress summary."""
+        if not self.score_history:
+            return
+        
+        recent_scores = self.score_history[-self.log_progress_interval:]
+        avg_recent = np.mean(recent_scores)
+        
+        self.logger.info(f"Progress: {self.trial_count} trials, "
+                        f"best={self.best_score:.4f}, "
+                        f"recent_avg={avg_recent:.4f}")
+
+
+class MLflowCallback(BaseCallback):
+    """
+    MLflow integration callback for experiment tracking.
+    
+    Automatically logs experiments, trials, metrics, parameters,
+    and artifacts to MLflow for comprehensive experiment management.
+    """
+    
+    def __init__(self, experiment_name: Optional[str] = None,
+                 tracking_uri: Optional[str] = None,
+                 log_artifacts: bool = True,
+                 log_models: bool = True):
+        """
+        Initialize MLflow callback.
+        
+        Args:
+            experiment_name: MLflow experiment name
+            tracking_uri: MLflow tracking server URI
+            log_artifacts: Whether to log artifacts
+            log_models: Whether to log best model
+        """
+        super().__init__("MLflow")
+        self.experiment_name = experiment_name or "MLTeammate_AutoML"
+        self.log_artifacts = log_artifacts
+        self.log_models = log_models
+        
+        # Import and configure MLflow
+        try:
+            import mlflow
+            import mlflow.sklearn
+            self.mlflow = mlflow
+            self.mlflow_sklearn = mlflow.sklearn
+            
+            if tracking_uri:
+                mlflow.set_tracking_uri(tracking_uri)
+            
+            # Set or create experiment
+            try:
+                self.experiment_id = mlflow.create_experiment(self.experiment_name)
+            except Exception:
+                # Experiment already exists
+                experiment = mlflow.get_experiment_by_name(self.experiment_name)
+                self.experiment_id = experiment.experiment_id
+            
+            self.logger.info(f"MLflow experiment: {self.experiment_name} ({self.experiment_id})")
+            
+        except ImportError:
+            self.logger.warning("MLflow not available. Install with: pip install mlflow")
+            self.mlflow = None
+    
+    def on_experiment_start(self, experiment_config: Dict[str, Any]):
+        """Start MLflow run for experiment."""
+        if not self.mlflow:
+            return
+        
+        self.mlflow.start_run(experiment_id=self.experiment_id)
+        
+        # Log experiment parameters
+        self.mlflow.log_params({
+            "task": experiment_config["task"],
+            "learner_names": ",".join(experiment_config["learner_names"]),
+            "searcher_type": experiment_config["searcher_type"],
+            "n_trials": experiment_config["n_trials"],
+            "cv_folds": experiment_config.get("cv_folds"),
+            "random_state": experiment_config["random_state"],
+            "n_samples": experiment_config["n_samples"],
+            "n_features": experiment_config["n_features"]
+        })
+        
+        # Log additional tags
+        self.mlflow.set_tags({
+            "framework": "MLTeammate",
+            "experiment_type": "automl",
+            "data_shape": f"{experiment_config['n_samples']}x{experiment_config['n_features']}"
+        })
+    
+    def on_trial_end(self, trial_id: str, config: Dict[str, Any], 
+                     score: float, is_best: bool):
+        """Log trial metrics to MLflow."""
+        if not self.mlflow:
+            return
+        
+        # Log trial score with step
+        trial_idx = int(trial_id.split('_')[1])
+        self.mlflow.log_metric("trial_score", score, step=trial_idx)
+        
+        # Log if this is the best trial
+        if is_best:
+            self.mlflow.log_metric("best_score", score)
+    
+    def on_experiment_end(self, results: Dict[str, Any]):
+        """Log final results and artifacts to MLflow."""
+        if not self.mlflow:
+            return
+        
+        try:
+            # Log final metrics
+            if results.get("best_score") is not None:
+                self.mlflow.log_metric("final_best_score", results["best_score"])
+            
+            exp_info = results.get("experiment_info", {})
+            self.mlflow.log_metrics({
+                "total_time": exp_info.get("total_time", 0),
+                "completed_trials": exp_info.get("n_completed_trials", 0),
+                "success_rate": exp_info.get("success_rate", 0),
+                "score_improvement": exp_info.get("score_improvement", 0)
+            })
+            
+            # Log best model
+            if self.log_models and results.get("best_model") is not None:
+                self.mlflow_sklearn.log_model(
+                    results["best_model"], 
+                    "best_model",
+                    input_example=None  # Could add example input
+                )
+            
+            # Log artifacts
+            if self.log_artifacts:
+                self._log_artifacts(results)
+            
+        finally:
+            self.mlflow.end_run()
+    
+    def _log_artifacts(self, results: Dict[str, Any]):
+        """Log experiment artifacts."""
+        import tempfile
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # Save results JSON
+            results_file = temp_path / "results.json"
+            with open(results_file, 'w') as f:
+                # Make results JSON serializable
+                serializable_results = self._make_json_serializable(results)
+                json.dump(serializable_results, f, indent=2)
+            self.mlflow.log_artifact(str(results_file))
+            
+            # Save search history plot
+            if results.get("search_history"):
+                plot_file = temp_path / "search_history.png"
+                self._create_search_history_plot(results["search_history"], str(plot_file))
+                self.mlflow.log_artifact(str(plot_file))
+            
+            # Save trial details
+            if results.get("trials"):
+                trials_file = temp_path / "trials.csv"
+                trials_df = pd.DataFrame(results["trials"])
+                trials_df.to_csv(trials_file, index=False)
+                self.mlflow.log_artifact(str(trials_file))
+    
+    def _make_json_serializable(self, obj):
+        """Convert object to JSON serializable format."""
+        if isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+            return int(obj)
+        elif isinstance(obj, (np.float64, np.float32, np.float16)):
+            return float(obj)
+        elif hasattr(obj, '__dict__'):
+            return str(obj)  # Convert complex objects to string
+        else:
+            return obj
+    
+    def _create_search_history_plot(self, scores: List[float], filename: str):
+        """Create and save search history plot."""
+        plt.figure(figsize=(10, 6))
+        plt.plot(scores, 'b-', alpha=0.7, label='Trial Scores')
+        
+        # Plot running best
+        running_best = []
+        best_so_far = scores[0] if scores else 0
+        for score in scores:
+            if score > best_so_far:
+                best_so_far = score
+            running_best.append(best_so_far)
+        
+        plt.plot(running_best, 'r-', linewidth=2, label='Best So Far')
+        
+        plt.xlabel('Trial')
+        plt.ylabel('Score')
+        plt.title('AutoML Search Progress')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(filename, dpi=150, bbox_inches='tight')
+        plt.close()
 
 
 class ArtifactCallback(BaseCallback):
     """
-    Artifact management callback for saving models, plots, and other outputs.
+    Artifact management callback for saving experiment outputs.
     
-    Features:
-    - Automatic model saving
-    - Feature importance plots
-    - Configuration dumps
-    - Performance visualizations
+    Saves models, configurations, results, and visualizations
+    to local filesystem for later analysis and reproducibility.
     """
     
-    def __init__(self, 
-                 save_best_model: bool = True,
-                 save_configs: bool = True,
-                 output_dir: str = "./mlteammate_artifacts"):
+    def __init__(self, output_dir: str = "mlteammate_artifacts",
+                 save_models: bool = True, save_plots: bool = True,
+                 save_configs: bool = True):
         """
         Initialize artifact callback.
         
         Args:
-            save_best_model: Whether to save the best model
-            save_configs: Whether to save trial configurations
             output_dir: Directory to save artifacts
+            save_models: Whether to save best model
+            save_plots: Whether to save visualization plots
+            save_configs: Whether to save trial configurations
         """
-        self.save_best_model = save_best_model
+        super().__init__("Artifacts")
+        self.output_dir = Path(output_dir)
+        self.save_models = save_models
+        self.save_plots = save_plots
         self.save_configs = save_configs
-        self.output_dir = output_dir
-        self.best_model = None
-        self.best_config = None
-        self.all_configs = []
         
         # Create output directory
-        os.makedirs(output_dir, exist_ok=True)
-    
-    def on_trial_end(self, trial_id: str, config: dict, score: float, is_best: bool) -> None:
-        """Store trial information for artifact generation."""
-        trial_info = {
-            "trial_id": trial_id,
-            "config": config,
-            "score": score,
-            "is_best": is_best,
-            "timestamp": datetime.now().isoformat()
-        }
-        self.all_configs.append(trial_info)
-    
-    def on_experiment_end(self, best_score: float, best_config: dict) -> None:
-        """Generate and save artifacts."""
-        self.best_config = best_config
+        self.output_dir.mkdir(exist_ok=True, parents=True)
         
+        # Experiment-specific directory
+        self.experiment_dir = None
+    
+    def on_experiment_start(self, experiment_config: Dict[str, Any]):
+        """Create experiment directory and save config."""
+        experiment_id = experiment_config.get("controller_id", "unknown")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        
+        self.experiment_dir = self.output_dir / f"experiment_{timestamp}_{experiment_id[:8]}"
+        self.experiment_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Save experiment configuration
         if self.save_configs:
-            self._save_configs()
+            config_file = self.experiment_dir / "experiment_config.json"
+            with open(config_file, 'w') as f:
+                json.dump(experiment_config, f, indent=2, default=str)
         
-        print(f"📁 Artifacts saved to: {self.output_dir}")
+        self.logger.info(f"Artifacts will be saved to: {self.experiment_dir}")
     
-    def _save_configs(self) -> None:
-        """Save all trial configurations to JSON file."""
-        config_file = os.path.join(self.output_dir, "trial_configs.json")
-        with open(config_file, 'w') as f:
-            json.dump(self.all_configs, f, indent=2)
-    
-    def save_model(self, model, filename: str = "best_model.pkl") -> None:
-        """Save the best model to disk."""
-        if not self.save_best_model:
+    def on_experiment_end(self, results: Dict[str, Any]):
+        """Save final experiment artifacts."""
+        if not self.experiment_dir:
             return
         
-        try:
-            import joblib
-            model_path = os.path.join(self.output_dir, filename)
-            joblib.dump(model, model_path)
-            print(f"💾 Model saved to: {model_path}")
-        except ImportError:
-            print("⚠️ joblib not available. Skipping model save.")
-        except Exception as e:
-            print(f"❌ Failed to save model: {e}")
+        # Save complete results
+        results_file = self.experiment_dir / "results.json"
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+        
+        # Save best model
+        if self.save_models and results.get("best_model") is not None:
+            model_file = self.experiment_dir / "best_model.pkl"
+            with open(model_file, 'wb') as f:
+                pickle.dump(results["best_model"], f)
+        
+        # Save trial configurations
+        if self.save_configs and results.get("trials"):
+            configs_file = self.experiment_dir / "trial_configs.json"
+            trial_configs = [trial["config"] for trial in results["trials"]]
+            with open(configs_file, 'w') as f:
+                json.dump(trial_configs, f, indent=2, default=str)
+        
+        # Save plots
+        if self.save_plots:
+            self._save_plots(results)
+        
+        self.logger.info(f"Artifacts saved to: {self.experiment_dir}")
+    
+    def _save_plots(self, results: Dict[str, Any]):
+        """Save visualization plots."""
+        # Search history plot
+        if results.get("search_history"):
+            plt.figure(figsize=(12, 8))
+            
+            scores = results["search_history"]
+            trials = range(1, len(scores) + 1)
+            
+            # Main score plot
+            plt.subplot(2, 2, 1)
+            plt.plot(trials, scores, 'b-', alpha=0.7, marker='o', markersize=3)
+            plt.xlabel('Trial')
+            plt.ylabel('Score')
+            plt.title('Trial Scores')
+            plt.grid(True, alpha=0.3)
+            
+            # Running best
+            plt.subplot(2, 2, 2)
+            running_best = []
+            best_so_far = scores[0] if scores else 0
+            for score in scores:
+                if score > best_so_far:
+                    best_so_far = score
+                running_best.append(best_so_far)
+            
+            plt.plot(trials, running_best, 'r-', linewidth=2)
+            plt.xlabel('Trial')
+            plt.ylabel('Best Score')
+            plt.title('Best Score Over Time')
+            plt.grid(True, alpha=0.3)
+            
+            # Score distribution
+            plt.subplot(2, 2, 3)
+            plt.hist(scores, bins=min(20, len(scores)//2), alpha=0.7, edgecolor='black')
+            plt.xlabel('Score')
+            plt.ylabel('Frequency')
+            plt.title('Score Distribution')
+            plt.grid(True, alpha=0.3)
+            
+            # Improvement over trials
+            plt.subplot(2, 2, 4)
+            if len(scores) > 1:
+                improvements = np.diff(running_best)
+                plt.plot(trials[1:], improvements, 'g-', marker='o', markersize=3)
+                plt.xlabel('Trial')
+                plt.ylabel('Score Improvement')
+                plt.title('Score Improvement per Trial')
+                plt.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.savefig(self.experiment_dir / "search_analysis.png", 
+                       dpi=150, bbox_inches='tight')
+            plt.close()
 
 
-# Factory function for easy callback creation
-def create_callbacks(logging: bool = True, 
-                    progress: bool = True, 
-                    artifacts: bool = True,
-                    **kwargs) -> list:
+class ProgressCallback(BaseCallback):
     """
-    Create a list of callbacks with common configurations.
+    Progress monitoring callback with live updates.
+    
+    Provides real-time progress tracking with ETA estimation,
+    performance summaries, and configurable update intervals.
+    """
+    
+    def __init__(self, update_interval: int = 5, show_eta: bool = True):
+        """
+        Initialize progress callback.
+        
+        Args:
+            update_interval: Update progress every N trials
+            show_eta: Whether to show estimated time to completion
+        """
+        super().__init__("Progress")
+        self.update_interval = update_interval
+        self.show_eta = show_eta
+        
+        # State tracking
+        self.start_time = None
+        self.total_trials = 0
+        self.completed_trials = 0
+        self.scores = []
+    
+    def on_experiment_start(self, experiment_config: Dict[str, Any]):
+        """Initialize progress tracking."""
+        self.start_time = time.time()
+        self.total_trials = experiment_config["n_trials"]
+        self.completed_trials = 0
+        self.scores = []
+        
+        print(f"\n🚀 Starting AutoML with {self.total_trials} trials...")
+        print("=" * 50)
+    
+    def on_trial_end(self, trial_id: str, config: Dict[str, Any], 
+                     score: float, is_best: bool):
+        """Update progress after each trial."""
+        self.completed_trials += 1
+        self.scores.append(score)
+        
+        if self.completed_trials % self.update_interval == 0:
+            self._show_progress()
+    
+    def on_experiment_end(self, results: Dict[str, Any]):
+        """Show final progress summary."""
+        self._show_final_summary(results)
+    
+    def _show_progress(self):
+        """Display current progress."""
+        elapsed = time.time() - self.start_time
+        progress_pct = (self.completed_trials / self.total_trials) * 100
+        
+        # Calculate ETA
+        eta_str = ""
+        if self.show_eta and self.completed_trials > 0:
+            time_per_trial = elapsed / self.completed_trials
+            remaining_trials = self.total_trials - self.completed_trials
+            eta_seconds = time_per_trial * remaining_trials
+            eta_str = f" | ETA: {eta_seconds:.0f}s"
+        
+        # Performance summary
+        best_score = max(self.scores) if self.scores else 0
+        avg_score = np.mean(self.scores) if self.scores else 0
+        
+        print(f"Progress: {self.completed_trials}/{self.total_trials} "
+              f"({progress_pct:.1f}%) | "
+              f"Best: {best_score:.4f} | "
+              f"Avg: {avg_score:.4f}{eta_str}")
+    
+    def _show_final_summary(self, results: Dict[str, Any]):
+        """Show final experiment summary."""
+        elapsed = time.time() - self.start_time
+        
+        print("=" * 50)
+        print("🎯 AutoML Completed!")
+        print(f"⏱️  Total time: {elapsed:.2f}s")
+        print(f"🧪 Trials: {self.completed_trials}/{self.total_trials}")
+        
+        if results.get("best_score") is not None:
+            print(f"🏆 Best score: {results['best_score']:.4f}")
+            
+            exp_info = results.get("experiment_info", {})
+            if exp_info.get("best_learner"):
+                print(f"🤖 Best learner: {exp_info['best_learner']}")
+        
+        print("=" * 50)
+
+
+def create_default_callbacks(log_level: str = "INFO", 
+                           output_dir: str = "mlteammate_artifacts",
+                           use_mlflow: bool = True,
+                           mlflow_experiment: Optional[str] = None) -> List[BaseCallback]:
+    """
+    Create default set of callbacks for AutoML experiments.
     
     Args:
-        logging: Whether to include LoggerCallback
-        progress: Whether to include ProgressCallback
-        artifacts: Whether to include ArtifactCallback
-        **kwargs: Additional arguments for callbacks
-    
+        log_level: Logging level
+        output_dir: Directory for artifacts
+        use_mlflow: Whether to include MLflow callback
+        mlflow_experiment: MLflow experiment name
+        
     Returns:
         List of configured callbacks
     """
-    callbacks = []
+    callbacks = [
+        LoggerCallback(log_level=log_level),
+        ProgressCallback(update_interval=5),
+        ArtifactCallback(output_dir=output_dir)
+    ]
     
-    if logging:
-        callbacks.append(LoggerCallback(**kwargs.get('logging', {})))
-    
-    if progress and 'total_trials' in kwargs:
-        callbacks.append(ProgressCallback(**kwargs.get('progress', {})))
-    
-    if artifacts:
-        callbacks.append(ArtifactCallback(**kwargs.get('artifacts', {})))
+    if use_mlflow:
+        callbacks.append(MLflowCallback(experiment_name=mlflow_experiment))
     
     return callbacks

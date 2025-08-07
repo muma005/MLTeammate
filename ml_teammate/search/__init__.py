@@ -1,146 +1,123 @@
-# ml_teammate/search/__init__.py
+"""
+MLTeammate Search Module
 
-# Import existing search components
-from .optuna_search import OptunaSearcher
-from .config_space import lightgbm_config, xgboost_config
+Phase 4: Clean, modern hyperparameter optimization system.
 
-# Import new search components
-from .flaml_search import (
-    FLAMLSearcher,
-    FLAMLTimeBudgetSearcher,
-    FLAMLResourceAwareSearcher
+Provides:
+- Multiple search algorithms (Optuna, FLAML, Random)
+- Consistent interfaces across all searchers
+- Integration with frozen Phase 3 learner registry
+- Comprehensive result tracking and analysis
+- Factory pattern for easy searcher creation
+"""
+
+from typing import List
+
+# Import base classes
+from .base import (
+    BaseSearcher, SearchResult, 
+    validate_config_against_space, create_searcher
 )
 
-from .eci import (
-    EarlyConvergenceIndicator,
-    AdaptiveECI,
-    MultiObjectiveECI
-)
+# Import specific searchers
+from .random_search import RandomSearcher, create_random_searcher
 
-# Export all search components
+# Conditional imports for optional dependencies
+try:
+    from .optuna_search import OptunaSearcher, create_optuna_searcher
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
+    OptunaSearcher = None
+    create_optuna_searcher = None
+
+try:
+    from .flaml_search import FLAMLSearcher, create_flaml_searcher
+    FLAML_AVAILABLE = True
+except ImportError:
+    FLAML_AVAILABLE = False
+    FLAMLSearcher = None
+    create_flaml_searcher = None
+
+# Availability checks
+def check_optuna_available() -> bool:
+    """Check if Optuna is available."""
+    return OPTUNA_AVAILABLE
+
+def check_flaml_available() -> bool:
+    """Check if FLAML is available."""
+    return FLAML_AVAILABLE
+
+def get_available_searchers() -> List[str]:
+    """Get list of available searcher types."""
+    searchers = ["random"]
+    
+    if OPTUNA_AVAILABLE:
+        searchers.append("optuna")
+    
+    if FLAML_AVAILABLE:
+        searchers.append("flaml")
+    
+    return searchers
+
+# Convenience functions
+def create_searcher_by_name(searcher_type: str, learner_names, task: str = "classification", **kwargs):
+    """
+    Create searcher by name with availability checking.
+    
+    Args:
+        searcher_type: Type of searcher ("optuna", "flaml", "random")
+        learner_names: List of learner names
+        task: Task type
+        **kwargs: Additional arguments
+        
+    Returns:
+        BaseSearcher: Configured searcher instance
+        
+    Raises:
+        ValueError: If searcher type is not available
+    """
+    searcher_type = searcher_type.lower()
+    
+    if searcher_type == "random":
+        return RandomSearcher(learner_names, task, **kwargs)
+    
+    elif searcher_type == "optuna":
+        if not OPTUNA_AVAILABLE:
+            raise ValueError("Optuna is not available. Install with: pip install optuna")
+        return OptunaSearcher(learner_names, task, **kwargs)
+    
+    elif searcher_type == "flaml":
+        if not FLAML_AVAILABLE:
+            raise ValueError("FLAML is not available. Install with: pip install flaml")
+        return FLAMLSearcher(learner_names, task, **kwargs)
+    
+    else:
+        available = get_available_searchers()
+        raise ValueError(f"Unknown searcher type: {searcher_type}. Available: {available}")
+
+# Export everything that's available
 __all__ = [
-    # Core searchers
-    'OptunaSearcher',
-    'FLAMLSearcher',
-    'FLAMLTimeBudgetSearcher',
-    'FLAMLResourceAwareSearcher',
+    # Base classes (always available)
+    "BaseSearcher",
+    "SearchResult", 
+    "validate_config_against_space",
+    "create_searcher",
     
-    # Early convergence indicators
-    'EarlyConvergenceIndicator',
-    'AdaptiveECI',
-    'MultiObjectiveECI',
+    # Random search (always available)
+    "RandomSearcher",
+    "create_random_searcher",
     
-    # Configuration spaces
-    'lightgbm_config',
-    'xgboost_config'
+    # Utility functions
+    "check_optuna_available",
+    "check_flaml_available", 
+    "get_available_searchers",
+    "create_searcher_by_name"
 ]
 
+# Add conditional exports
+if OPTUNA_AVAILABLE:
+    __all__.extend(["OptunaSearcher", "create_optuna_searcher"])
 
-def get_searcher(searcher_type: str, **kwargs):
-    """
-    Factory function to create searchers by type.
-    
-    Args:
-        searcher_type: Type of searcher ("optuna", "flaml", "flaml_time", "flaml_resource")
-        **kwargs: Arguments for the searcher
-        
-    Returns:
-        Configured searcher instance
-        
-    Raises:
-        ValueError: If searcher type is not supported
-    """
-    if searcher_type == "optuna":
-        return OptunaSearcher(**kwargs)
-    elif searcher_type == "flaml":
-        return FLAMLSearcher(**kwargs)
-    elif searcher_type == "flaml_time":
-        return FLAMLTimeBudgetSearcher(**kwargs)
-    elif searcher_type == "flaml_resource":
-        return FLAMLResourceAwareSearcher(**kwargs)
-    else:
-        available = ["optuna", "flaml", "flaml_time", "flaml_resource"]
-        raise ValueError(f"Unknown searcher type '{searcher_type}'. Available: {available}")
-
-
-def get_eci(eci_type: str = "standard", **kwargs):
-    """
-    Factory function to create Early Convergence Indicators by type.
-    
-    Args:
-        eci_type: Type of ECI ("standard", "adaptive", "multi_objective")
-        **kwargs: Arguments for the ECI
-        
-    Returns:
-        Configured ECI instance
-        
-    Raises:
-        ValueError: If ECI type is not supported
-    """
-    if eci_type == "standard":
-        return EarlyConvergenceIndicator(**kwargs)
-    elif eci_type == "adaptive":
-        return AdaptiveECI(**kwargs)
-    elif eci_type == "multi_objective":
-        objectives = kwargs.pop("objectives", ["accuracy"])
-        return MultiObjectiveECI(objectives=objectives, **kwargs)
-    else:
-        available = ["standard", "adaptive", "multi_objective"]
-        raise ValueError(f"Unknown ECI type '{eci_type}'. Available: {available}")
-
-
-def list_available_searchers():
-    """
-    List all available searcher types.
-    
-    Returns:
-        Dictionary with searcher information
-    """
-    return {
-        "optuna": {
-            "description": "Optuna-based hyperparameter optimization",
-            "features": ["TPE sampler", "Random sampler", "Multi-objective", "Pruning"],
-            "dependencies": ["optuna"]
-        },
-        "flaml": {
-            "description": "FLAML-based hyperparameter optimization",
-            "features": ["Time budget", "Resource management", "Early stopping"],
-            "dependencies": ["flaml"]
-        },
-        "flaml_time": {
-            "description": "FLAML with time budget focus",
-            "features": ["Time-bounded optimization", "Fast convergence"],
-            "dependencies": ["flaml"]
-        },
-        "flaml_resource": {
-            "description": "FLAML with resource awareness",
-            "features": ["Memory budget", "Computational constraints"],
-            "dependencies": ["flaml"]
-        }
-    }
-
-
-def list_available_eci_types():
-    """
-    List all available ECI types.
-    
-    Returns:
-        Dictionary with ECI information
-    """
-    return {
-        "standard": {
-            "description": "Standard early convergence detection",
-            "methods": ["moving_average", "improvement_rate", "confidence_interval", "plateau_detection"],
-            "features": ["Statistical analysis", "Multiple convergence methods"]
-        },
-        "adaptive": {
-            "description": "Adaptive convergence detection",
-            "methods": ["All standard methods", "Parameter adaptation"],
-            "features": ["Self-tuning parameters", "Performance-based adaptation"]
-        },
-        "multi_objective": {
-            "description": "Multi-objective convergence detection",
-            "methods": ["Composite scoring", "Objective-wise analysis"],
-            "features": ["Multiple objectives", "Weighted convergence"]
-        }
-    }
+if FLAML_AVAILABLE:
+    __all__.extend(["FLAMLSearcher", "create_flaml_searcher"])

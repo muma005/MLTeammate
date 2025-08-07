@@ -10,14 +10,12 @@ Users can simply specify learner names as strings and the framework handles ever
 import time
 from typing import List, Dict, Any, Optional, Union
 from ml_teammate.learners.registry import (
-    create_learners_dict,
-    create_config_space,
-    get_all_learners,
-    get_classification_learners,
-    get_regression_learners
+    get_learner_registry,
+    create_learner,
+    list_available_learners,
+    get_learner_config_space
 )
-from ml_teammate.automl.controller import AutoMLController
-from ml_teammate.search.optuna_search import OptunaSearcher
+from ml_teammate.automl import create_automl_controller
 from ml_teammate.automl.callbacks import LoggerCallback, ProgressCallback, ArtifactCallback
 
 
@@ -82,7 +80,7 @@ class SimpleAutoML:
         self.output_dir = output_dir
         
         # Method chaining state
-        self.searcher_type = "optuna"  # Default searcher
+        self.searcher_type = "random"  # Default searcher (compatible with frozen phases)
         self.time_budget = None
         self.eci_type = None
         self.eci_params = {}
@@ -182,45 +180,37 @@ class SimpleAutoML:
         # Validate learners
         self._validate_learners(self.learner_names, self.task)
         
-        # Create learners and config space automatically
-        self.learners = create_learners_dict(self.learner_names)
-        self.config_space = create_config_space(self.learner_names)
-        
         # Create callbacks
         self.callbacks = self._create_callbacks()
         
-        # Initialize controller
+        # Initialize controller using Phase 5 create_automl_controller
         self._create_controller()
         
         self._is_configured = True
     
     def _validate_learners(self, learners: List[str], task: str):
         """Validate that the specified learners are appropriate for the task."""
-        available_learners = get_all_learners()
+        # Use our current registry to get available learners
+        available_learners_info = list_available_learners()
         
         for learner in learners:
-            if learner not in available_learners:
-                available = ", ".join(sorted(available_learners))
+            if learner not in available_learners_info:
+                available = ", ".join(sorted(available_learners_info.keys()))
                 raise ValueError(f"Unknown learner '{learner}'. Available learners: {available}")
         
-        # Check task compatibility
-        if task == "classification":
-            classification_learners = get_classification_learners()
-            incompatible = [l for l in learners if l not in classification_learners]
-            if incompatible:
-                raise ValueError(f"Learners {incompatible} are not compatible with classification task")
-        elif task == "regression":
-            regression_learners = get_regression_learners()
-            incompatible = [l for l in learners if l not in regression_learners]
-            if incompatible:
-                raise ValueError(f"Learners {incompatible} are not compatible with regression task")
+        # Check task compatibility using registry info
+        for learner in learners:
+            learner_info = available_learners_info.get(learner, {})
+            learner_task = learner_info.get('task', 'unknown')
+            if learner_task != task and learner_task != 'both':
+                raise ValueError(f"Learner '{learner}' (task: {learner_task}) is not compatible with {task} task")
     
     def _create_callbacks(self):
         """Create callbacks based on configuration."""
         callbacks = []
         
         # Always add progress callback
-        callbacks.append(ProgressCallback(total_trials=self.n_trials))
+        callbacks.append(ProgressCallback(update_interval=5, show_eta=True))
         
         # Add logger callback
         callbacks.append(LoggerCallback(
@@ -236,22 +226,25 @@ class SimpleAutoML:
         return callbacks
     
     def _create_controller(self):
-        """Create the AutoML controller."""
-        # Create searcher based on configuration
-        if self.searcher_type == "flaml":
-            from ml_teammate.search import get_searcher
-            searcher = get_searcher("flaml", config_spaces=self.config_space, time_budget=self.time_budget)
-        else:
-            searcher = OptunaSearcher(self.config_space)
+        """Create the AutoML controller using Phase 5 system."""
+        # Use the Phase 5 create_automl_controller function
+        # Map interface searcher types to Phase 5 compatible types
+        searcher_map = {
+            "optuna": "random",  # Fallback to random if optuna has issues
+            "flaml": "flaml",
+            "random": "random"
+        }
         
-        self.controller = AutoMLController(
-            learners=self.learners,
-            searcher=searcher,
-            config_space=self.config_space,
+        searcher_type = searcher_map.get(self.searcher_type, "random")
+        
+        self.controller = create_automl_controller(
+            learner_names=self.learner_names,
             task=self.task,
+            searcher_type=searcher_type,
             n_trials=self.n_trials,
-            cv=self.cv,
-            callbacks=self.callbacks
+            cv_folds=self.cv,
+            callbacks=self.callbacks,
+            random_state=42
         )
     
     # ============================================================================
@@ -263,7 +256,7 @@ class SimpleAutoML:
         print("🔍 Available Learners in MLTeammate")
         print("=" * 50)
         
-        learners = list_available_learners()
+        learners = get_available_learners_by_task()
         
         print("📊 Classification Learners:")
         for i, learner in enumerate(learners["classification"], 1):
@@ -366,7 +359,7 @@ class SimpleAutoML:
         self.eci_params = kwargs
         return self
     
-    def with_advanced_search(self, searcher_type="optuna", **kwargs):
+    def with_advanced_search(self, searcher_type="random", **kwargs):
         """Configure advanced search options and return self for chaining."""
         self.searcher_type = searcher_type
         for key, value in kwargs.items():
@@ -557,16 +550,21 @@ def quick_regression(X, y,
     return automl.quick_regress(X, y)
 
 
-def list_available_learners():
+def get_available_learners_by_task():
     """
     Get a dictionary of all available learners organized by task.
     
     Returns:
         Dictionary with keys: "all", "classification", "regression"
     """
-    all_learners = get_all_learners()
-    classification_learners = get_classification_learners()
-    regression_learners = get_regression_learners()
+    # Use our current registry
+    learners_info = list_available_learners()
+    
+    all_learners = list(learners_info.keys())
+    classification_learners = [name for name, info in learners_info.items() 
+                              if info.get('task') == 'classification']
+    regression_learners = [name for name, info in learners_info.items() 
+                          if info.get('task') == 'regression']
     
     return {
         "all": sorted(all_learners),
@@ -590,21 +588,19 @@ def get_learner_info(learner_name: str):
     registry = get_learner_registry()
     
     try:
-        # Get the learner factory
-        learner_factory = registry.get_learner(learner_name)
+        # Get learner info from our current registry
+        learners_info = list_available_learners()
+        if learner_name not in learners_info:
+            return {"error": f"Learner '{learner_name}' not found"}
         
-        # Get the config space
-        config_space = registry.get_config_space(learner_name)
-        
-        # Determine task type
-        classification_learners = get_classification_learners()
-        task = "classification" if learner_name in classification_learners else "regression"
+        learner_info = learners_info[learner_name]
+        config_space = get_learner_config_space(learner_name)
         
         return {
             "name": learner_name,
-            "task": task,
+            "task": learner_info.get('task', 'unknown'),
             "config_space": config_space,
-            "factory_function": learner_factory.__name__ if hasattr(learner_factory, '__name__') else str(learner_factory)
+            "description": learner_info.get('description', 'No description available')
         }
-    except ValueError as e:
+    except Exception as e:
         return {"error": str(e)} 

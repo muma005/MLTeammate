@@ -1,34 +1,29 @@
-# tutorials/03_with_mlflow.py
 """
-03_with_mlflow.py
------------------
-Demonstrate MLTeammate with enhanced MLflow experiment tracking and artifact management.
-Shows professional-grade experiment tracking with nested runs for trial-level granularity.
+MLTeammate Tutorial 3: MLflow Integration
+
+This tutorial demonstrates how to use MLTeammate with MLflow experiment tracking.
+Uses the MLTeammate API interface with MLflow integration enabled.
 """
 
 import os
-import mlflow
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
-from ml_teammate.automl.controller import AutoMLController
-from ml_teammate.search.optuna_search import OptunaSearcher
-from ml_teammate.learners.xgboost_learner import XGBoostLearner
-from ml_teammate.automl.callbacks import LoggerCallback, ProgressCallback, ArtifactCallback
-from ml_teammate.experiments.mlflow_helper import MLflowHelper
+# Use the MLTeammate API interface
+from ml_teammate.interface.api import MLTeammate
 
 def create_feature_importance_plot(model, feature_names=None, save_path="./feature_importance.png"):
     """Create and save feature importance plot."""
     try:
         import matplotlib.pyplot as plt
         
-        # Get feature importance
-        if hasattr(model, 'feature_importances_'):
-            importances = model.feature_importances_
-        elif hasattr(model, 'model') and hasattr(model.model, 'feature_importances_'):
+        # Get feature importance from the wrapped model
+        if hasattr(model, 'model') and hasattr(model.model, 'feature_importances_'):
             importances = model.model.feature_importances_
+        elif hasattr(model, 'feature_importances_'):
+            importances = model.feature_importances_
         else:
             print("⚠️ Model doesn't have feature_importances_ attribute")
             return None
@@ -55,10 +50,8 @@ def create_feature_importance_plot(model, feature_names=None, save_path="./featu
         return None
 
 def main():
-    # Set up MLflow tracking
-    os.makedirs("./mlruns", exist_ok=True)
-    mlflow.set_tracking_uri("file:./mlruns")
-    mlflow.set_experiment("mlteammate_tutorial")
+    print("🚀 MLTeammate Tutorial 3: MLflow Integration")
+    print("=" * 50)
     
     # Create synthetic dataset
     print("🔬 Creating synthetic classification dataset...")
@@ -79,120 +72,68 @@ def main():
     print(f"📊 Dataset shape: {X.shape}")
     print(f"🎯 Classes: {np.unique(y)}")
     
-    # Define configuration space
-    config_space = {
-        "xgboost": {
-            "n_estimators": {"type": "int", "bounds": [50, 200]},
-            "max_depth": {"type": "int", "bounds": [3, 10]},
-            "learning_rate": {"type": "float", "bounds": [0.01, 0.3]},
-            "subsample": {"type": "float", "bounds": [0.6, 1.0]},
-            "colsample_bytree": {"type": "float", "bounds": [0.6, 1.0]}
-        }
-    }
-    
-    # Create callbacks with enhanced MLflow support
-    callbacks = [
-        LoggerCallback(
-            use_mlflow=True,
-            log_level="INFO",
-            experiment_name="mlteammate_tutorial"
-        ),
-        ProgressCallback(total_trials=10, patience=3),
-        ArtifactCallback(
-            save_best_model=True,
-            save_configs=True,
-            output_dir="./mlteammate_artifacts"
-        )
-    ]
-    
-    # Initialize MLflow helper (optional - callbacks handle MLflow internally)
-    mlflow_helper = MLflowHelper(
-        experiment_name="mlteammate_tutorial",
-        tracking_uri="file:./mlruns"
-    )
-    
-    print("🚀 Starting AutoML experiment with enhanced MLflow tracking...")
-    print("📋 This will create nested runs for each trial with detailed tracking")
-    
-    # Create and run AutoML controller
-    controller = AutoMLController(
-        learners={"xgboost": XGBoostLearner},
-        searcher=OptunaSearcher(config_space),
-        config_space=config_space,
+    # Create AutoML instance with MLflow enabled
+    print("\n🤖 Setting up AutoML with MLflow tracking...")
+    automl = MLTeammate(
+        learners=["random_forest", "gradient_boosting"],  # Use available learners
         task="classification",
-        n_trials=10,
-        cv=3,
-        callbacks=callbacks,
-        mlflow_helper=mlflow_helper  # Optional - callbacks handle MLflow
+        searcher_type="random",
+        n_trials=8,
+        cv_folds=3,
+        enable_mlflow=True,  # Enable MLflow tracking
+        random_state=42
     )
+    
+    print("🚀 Starting AutoML experiment with MLflow tracking...")
+    print("📋 This will log experiment data to MLflow")
     
     # Fit the model
-    controller.fit(X_train, y_train)
+    print("\n🏋️ Training AutoML models...")
+    automl.fit(X_train, y_train)
     
     # Make predictions
-    y_pred = controller.predict(X_test)
+    print("\n🔮 Making predictions...")
+    y_pred = automl.predict(X_test)
     test_accuracy = accuracy_score(y_test, y_pred)
     
     # Create and save feature importance plot
-    if controller.best_model:
+    print("\n📊 Creating feature importance plot...")
+    if automl.best_model:
         plot_path = create_feature_importance_plot(
-            controller.best_model,
+            automl.best_model,
             feature_names=[f"feature_{i}" for i in range(X.shape[1])]
         )
-        
-        # Log the plot as an experiment artifact
-        if plot_path and hasattr(controller, 'callbacks'):
-            for callback in controller.callbacks:
-                if hasattr(callback, 'mlflow') and callback.mlflow:
-                    try:
-                        callback.mlflow.log_experiment_artifact(plot_path, "feature_importance.png")
-                        print(f"📊 Feature importance plot logged to MLflow")
-                    except Exception as e:
-                        print(f"⚠️ Failed to log plot to MLflow: {e}")
     
-    # Log classification report
+    # Generate classification report
     report = classification_report(y_test, y_pred, output_dict=True)
     
-    # Save the best model
-    if hasattr(controller, 'best_model') and controller.best_model:
-        try:
-            import joblib
-            model_path = "./best_model.pkl"
-            joblib.dump(controller.best_model, model_path)
-            
-            # Log model as experiment artifact
-            for callback in controller.callbacks:
-                if hasattr(callback, 'mlflow') and callback.mlflow:
-                    try:
-                        callback.mlflow.log_experiment_artifact(model_path, "best_model.pkl")
-                        print(f"💾 Best model saved and logged to MLflow")
-                    except Exception as e:
-                        print(f"⚠️ Failed to log model to MLflow: {e}")
-            
-            # Clean up
-            os.remove(model_path)
-        except ImportError:
-            print("⚠️ joblib not available. Skipping model save.")
-    
     print(f"\n🎉 Experiment completed!")
-    print(f"📈 Best CV Score: {controller.best_score:.4f}")
+    print(f"📈 Best CV Score: {automl.best_score:.4f}")
     print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-    print(f"📊 Best Configuration: {controller.searcher.get_best()}")
-    print(f"📁 MLflow tracking URI: {mlflow.get_tracking_uri()}")
-    print(f"🔗 View results: mlflow ui --backend-store-uri {mlflow.get_tracking_uri()}")
+    print(f"🏆 Best Configuration: {automl.best_config}")
     
-    # Show MLflow experiment structure
-    print(f"\n📋 MLflow Experiment Structure:")
-    print(f"   Experiment: mlteammate_tutorial")
-    print(f"   ├── Parent Run: Contains experiment summary and best results")
-    print(f"   ├── Trial 1: Individual trial with parameters and metrics")
-    print(f"   ├── Trial 2: Individual trial with parameters and metrics")
-    print(f"   └── ... (one nested run per trial)")
-    print(f"\n💡 Benefits of this structure:")
-    print(f"   • Each trial has its own run with detailed parameters")
-    print(f"   • Easy to compare trials within the experiment")
-    print(f"   • Professional-grade experiment tracking")
-    print(f"   • Rich metadata and artifact management")
+    # Show summary
+    print("\n� Results Summary:")
+    summary = automl.summary()
+    for key, value in summary.items():
+        print(f"   {key}: {value}")
+    
+    # MLflow information
+    print(f"\n📊 MLflow Integration:")
+    print(f"   ✓ Experiment tracking enabled")
+    print(f"   ✓ Trial parameters and metrics logged")
+    print(f"   ✓ Best model performance recorded")
+    print(f"   ✓ Cross-validation results tracked")
+    
+    print(f"\n� MLflow Benefits:")
+    print(f"   • Automatic experiment tracking")
+    print(f"   • Parameter and metric logging")
+    print(f"   • Model performance comparison")
+    print(f"   • Reproducible experiments")
+    
+    print(f"\n🎯 To view results in MLflow UI:")
+    print(f"   Run: mlflow ui")
+    print(f"   Then visit: http://localhost:5000")
 
 if __name__ == "__main__":
     main()

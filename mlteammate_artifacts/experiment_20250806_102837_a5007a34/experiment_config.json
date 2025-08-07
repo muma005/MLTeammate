@@ -1,0 +1,20 @@
+{
+  "controller_id": "a5007a34-56c9-4f21-9299-31a79f9c0654",
+  "task": "classification",
+  "learner_names": [
+    "random_forest",
+    "logistic_regression"
+  ],
+  "searcher_type": "random",
+  "n_trials": 5,
+  "cv_folds": null,
+  "random_state": 42,
+  "data_shape": [
+    140,
+    10
+  ],
+  "n_samples": 140,
+  "n_features": 10,
+  "target_type": "int64",
+  "start_time": 1754465317.0336654
+}

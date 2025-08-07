@@ -5,6 +5,14 @@ This test suite verifies that the new simplified API works correctly
 and that users can use MLTeammate without writing custom code.
 """
 
+import sys
+from pathlib import Path
+
+# Ensure we're using the correct MLTeammate-1 directory
+current_dir = Path(__file__).parent.parent
+sys.path = [p for p in sys.path if 'MLTeammate' not in p]  # Remove any MLTeammate paths
+sys.path.insert(0, str(current_dir))  # Add our current directory first
+
 import numpy as np
 import pytest
 from sklearn.datasets import make_classification, make_regression
@@ -15,13 +23,10 @@ from ml_teammate.interface.simple_api import (
     SimpleAutoML,
     quick_classification,
     quick_regression,
-    list_available_learners,
+    get_available_learners_by_task,
     get_learner_info
 )
-from ml_teammate.learners.registry import (
-    get_classification_learners,
-    get_regression_learners
-)
+from ml_teammate.learners.registry import get_learner_registry
 
 
 class TestSimpleAPI:
@@ -29,7 +34,7 @@ class TestSimpleAPI:
     
     def test_list_available_learners(self):
         """Test that we can list available learners."""
-        learners = list_available_learners()
+        learners = get_available_learners_by_task()
         
         assert "classification" in learners
         assert "regression" in learners
@@ -212,15 +217,22 @@ class TestSimpleAPI:
     
     def test_default_learners(self):
         """Test that default learners are used when none specified."""
+        # Get registry for validation
+        registry = get_learner_registry()
+        
         # Classification defaults
         automl_clf = SimpleAutoML(task="classification")
         assert len(automl_clf.learner_names) > 0
-        assert all(l in get_classification_learners() for l in automl_clf.learner_names)
+        # Validate learners exist in registry
+        for learner_name in automl_clf.learner_names:
+            assert registry.has_learner(learner_name), f"Learner {learner_name} not found in registry"
         
         # Regression defaults
         automl_reg = SimpleAutoML(task="regression")
         assert len(automl_reg.learner_names) > 0
-        assert all(l in get_regression_learners() for l in automl_reg.learner_names)
+        # Validate learners exist in registry
+        for learner_name in automl_reg.learner_names:
+            assert registry.has_learner(learner_name), f"Learner {learner_name} not found in registry"
 
 
 if __name__ == "__main__":

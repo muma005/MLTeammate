@@ -1,0 +1,156 @@
+{
+  "trials": [
+    {
+      "trial_id": "trial_000_38fe4282",
+      "trial_idx": 0,
+      "config": {
+        "learner_name": "random_forest",
+        "n_estimators": 56,
+        "max_depth": 11,
+        "min_samples_split": 5,
+        "min_samples_leaf": 4,
+        "max_features": "sqrt",
+        "criterion": "gini",
+        "random_state": 42
+      },
+      "score": 0.8,
+      "duration": 0.24184229999082163,
+      "timestamp": 1754464753.1870627,
+      "is_best": true
+    },
+    {
+      "trial_id": "trial_001_446e90b1",
+      "trial_idx": 1,
+      "config": {
+        "learner_name": "random_forest",
+        "n_estimators": 201,
+        "max_depth": 16,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "criterion": "gini",
+        "random_state": 42
+      },
+      "score": 0.8333333333333334,
+      "duration": 0.5104566999943927,
+      "timestamp": 1754464753.69893,
+      "is_best": true
+    },
+    {
+      "trial_id": "trial_002_fecc0849",
+      "trial_idx": 2,
+      "config": {
+        "learner_name": "random_forest",
+        "n_estimators": 179,
+        "max_depth": 3,
+        "min_samples_split": 10,
+        "min_samples_leaf": 4,
+        "max_features": null,
+        "criterion": "entropy",
+        "random_state": 42
+      },
+      "score": 0.8,
+      "duration": 0.5448920000053477,
+      "timestamp": 1754464754.2453158,
+      "is_best": false
+    },
+    {
+      "trial_id": "trial_003_5e441bf4",
+      "trial_idx": 3,
+      "config": {
+        "learner_name": "random_forest",
+        "n_estimators": 164,
+        "max_depth": 11,
+        "min_samples_split": 2,
+        "min_samples_leaf": 3,
+        "max_features": null,
+        "criterion": "entropy",
+        "random_state": 42
+      },
+      "score": 0.8333333333333334,
+      "duration": 0.4489893999998458,
+      "timestamp": 1754464754.6951478,
+      "is_best": false
+    },
+    {
+      "trial_id": "trial_004_70097642",
+      "trial_idx": 4,
+      "config": {
+        "learner_name": "logistic_regression",
+        "C": 0.02451075609557497,
+        "penalty": "l2",
+        "solver": "lbfgs",
+        "max_iter": 309,
+        "class_weight": null,
+        "random_state": 42
+      },
+      "score": 0.7,
+      "duration": 0.013888799992855638,
+      "timestamp": 1754464754.7100904,
+      "is_best": false
+    }
+  ],
+  "best_score": 0.8333333333333334,
+  "best_config": {
+    "learner_name": "random_forest",
+    "n_estimators": 201,
+    "max_depth": 16,
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "max_features": "sqrt",
+    "criterion": "gini",
+    "random_state": 42
+  },
+  "best_model": "SklearnWrapper(config={'criterion': 'gini', 'max_depth': 16,\n                       'max_features': 'sqrt', 'min_samples_leaf': 1,\n                       'min_samples_split': 2, 'n_estimators': 201,\n                       'random_state': 42},\n               model_class=<class 'sklearn.ensemble._forest.RandomForestClassifier'>,\n               name='random_forest')",
+  "experiment_info": {
+    "original_data_shape": [
+      140,
+      10
+    ],
+    "target_distribution": {
+      "n_classes": 3,
+      "class_distribution": {
+        "0": 52,
+        "1": 43,
+        "2": 45
+      },
+      "is_balanced": "True"
+    },
+    "total_time": 1.7939031000132672,
+    "n_completed_trials": 5,
+    "success_rate": 1.0,
+    "best_learner": "random_forest",
+    "score_improvement": 0.033333333333333326,
+    "searcher_summary": {
+      "searcher_type": "RandomSearcher",
+      "task": "classification",
+      "learner_names": [
+        "random_forest",
+        "logistic_regression"
+      ],
+      "n_trials": 5,
+      "best_score": 0.8333333333333334,
+      "best_config": {
+        "learner_name": "random_forest",
+        "n_estimators": 201,
+        "max_depth": 16,
+        "min_samples_split": 2,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "criterion": "gini",
+        "random_state": 42
+      },
+      "config_spaces": {
+        "random_forest": 7,
+        "logistic_regression": 6
+      }
+    }
+  },
+  "search_history": [
+    0.8,
+    0.8333333333333334,
+    0.8,
+    0.8333333333333334,
+    0.7
+  ]
+}

@@ -2,90 +2,97 @@
 """
 05_optuna_search_example.py
 ---------------------------
-Demonstrate advanced Optuna search capabilities in MLTeammate with pandas-style interface.
+Demonstrate search capabilities in MLTeammate with different searcher types.
 
 This tutorial showcases:
-1. Different Optuna samplers (TPE, Random, CmaEs, NSGAII)
-2. Multi-objective optimization
-3. Custom optimization objectives
-4. Regression with Optuna
-5. Advanced search strategies
+1. Different search algorithms (Random, FLAML if available)
+2. Search parameter optimization
+3. Performance comparison between searchers
+4. Advanced search configurations
 
-Perfect for users who want to explore advanced optimization techniques!
+Perfect for users who want to explore different optimization strategies!
 """
 
 import numpy as np
-import optuna
 from sklearn.datasets import make_classification, make_regression
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import accuracy_score, mean_squared_error, make_scorer
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, r2_score
 
-# Import the pandas-style API
-from ml_teammate.interface import SimpleAutoML
-from ml_teammate.search.optuna_search import OptunaSearcher
-from ml_teammate.learners.registry import get_learner_registry
+# Import the MLTeammate API
+from ml_teammate.interface.api import MLTeammate
 
 # ============================================================================
-# STEP 1: Explore Available Searchers (No Functions!)
+# STEP 1: Explore Available Search Algorithms
 # ============================================================================
 
-print("🔍 STEP 1: Explore Available Searchers")
+print("🔍 STEP 1: Available Search Algorithms in MLTeammate")
 print("=" * 50)
 
-# Import search components
-from ml_teammate.search import list_available_searchers
+# Available search algorithms
+available_searchers = {
+    "random": "Random search - explores parameter space randomly",
+    "flaml": "FLAML search - Microsoft's fast AutoML library (if available)",
+    "optuna": "Optuna search - advanced optimization (fallback to random if not available)"
+}
 
-# List available searchers
-searchers = list_available_searchers()
-print("📊 Available Searchers:")
-for name, info in searchers.items():
-    print(f"   • {name}: {info['description']}")
-    print(f"     Features: {', '.join(info['features'])}")
-    print(f"     Dependencies: {', '.join(info['dependencies'])}")
-    print()
+print("📊 Available Search Algorithms:")
+for i, (name, description) in enumerate(available_searchers.items(), 1):
+    print(f"   {i:2d}. {name}: {description}")
+
+print(f"\n📋 Total Available Searchers: {len(available_searchers)}")
+print("💡 You can specify searcher_type in MLTeammate API!")
 
 # ============================================================================
-# STEP 2: Different Optuna Samplers (No Functions!)
+# STEP 2: Basic Search Algorithm Comparison
 # ============================================================================
 
-print("\n🔬 STEP 2: Different Optuna Samplers")
+print("\n🔬 STEP 2: Basic Search Algorithm Comparison")
 print("=" * 50)
 
 # Generate sample data
-X, y = make_classification(n_samples=500, n_features=20, random_state=42)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X, y = make_classification(
+    n_samples=800,
+    n_features=20,
+    n_informative=10,
+    n_redundant=5,
+    random_state=42
+)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
 print(f"📊 Dataset shape: {X.shape}")
 print(f"🎯 Classes: {np.unique(y)}")
 
-# Test different samplers using SimpleAutoML
-samplers_to_test = ["TPE", "Random", "CmaEs", "NSGAII"]
+# Test different search algorithms
+search_algorithms = ["random", "flaml"]
 results = {}
 
-for sampler_name in samplers_to_test:
-    print(f"\n🧪 Testing {sampler_name} sampler:")
+for searcher_type in search_algorithms:
+    print(f"\n🧪 Testing {searcher_type} search:")
     
     try:
-        # Use SimpleAutoML with specific sampler
-        automl = SimpleAutoML(
-            learners=["random_forest", "logistic_regression"],
+        automl = MLTeammate(
+            learners=["random_forest", "gradient_boosting", "logistic_regression"],
             task="classification",
-            n_trials=5,
-            cv=3
+            searcher_type=searcher_type,
+            n_trials=8,
+            cv_folds=3,
+            random_state=42
         )
         
-        # Configure with specific sampler
-        automl.with_advanced_search(searcher_type="optuna", sampler=sampler_name).quick_classify(X_train, y_train)
+        automl.fit(X_train, y_train)
         
         # Test the model
         y_pred = automl.predict(X_test)
         test_accuracy = accuracy_score(y_test, y_pred)
         
-        results[sampler_name] = {
+        results[searcher_type] = {
             "best_cv_score": automl.best_score,
             "test_accuracy": test_accuracy,
-            "best_config": automl.best_config
+            "best_config": automl.best_config,
+            "best_learner": automl.best_config.get('learner_name', 'unknown')
         }
         
         print(f"   ✅ Best CV Score: {automl.best_score:.4f}")
@@ -94,23 +101,23 @@ for sampler_name in samplers_to_test:
         
     except Exception as e:
         print(f"   ❌ Failed: {e}")
-        results[sampler_name] = {"error": str(e)}
+        results[searcher_type] = {"error": str(e)}
 
 # Compare results
-print(f"\n📊 Sampler Comparison:")
-print(f"{'Sampler':<10} {'CV Score':<10} {'Test Score':<10}")
-print("-" * 30)
-for sampler, result in results.items():
+print(f"\n📊 Search Algorithm Comparison:")
+print(f"{'Algorithm':<12} {'CV Score':<10} {'Test Score':<10} {'Best Learner':<15}")
+print("-" * 55)
+for searcher, result in results.items():
     if "error" not in result:
-        print(f"{sampler:<10} {result['best_cv_score']:<10.4f} {result['test_accuracy']:<10.4f}")
+        print(f"{searcher:<12} {result['best_cv_score']:<10.4f} {result['test_accuracy']:<10.4f} {result['best_learner']:<15}")
     else:
-        print(f"{sampler:<10} {'Failed':<10} {'N/A':<10}")
+        print(f"{searcher:<12} {'Failed':<10} {'N/A':<10} {'N/A':<15}")
 
 # ============================================================================
-# STEP 3: Multi-Objective Optimization (No Functions!)
+# STEP 3: Search with Different Trial Counts
 # ============================================================================
 
-print("\n🎯 STEP 3: Multi-Objective Optimization")
+print("\n🎯 STEP 3: Search with Different Trial Counts")
 print("=" * 50)
 
 # Generate data
@@ -119,72 +126,58 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Method 1: Using SimpleAutoML with multi-objective
-print("\n🔬 Method 1: Multi-objective with SimpleAutoML")
-automl = SimpleAutoML(
-    learners=["random_forest", "logistic_regression"],
-    task="classification",
-    n_trials=5,
-    cv=3
-)
+# Test different trial counts
+trial_counts = [3, 5, 10, 15]
+trial_results = {}
 
-# Configure for multi-objective optimization
-automl.with_advanced_search(
-    searcher_type="optuna", 
-    sampler="NSGAII",
-    objectives=["accuracy", "speed"]
-).quick_classify(X_train, y_train)
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-
-# Method 2: Direct multi-objective searcher
-print("\n🔬 Method 2: Direct multi-objective searcher")
-try:
-    # Create custom multi-objective study
-    study = optuna.create_study(
-        directions=["maximize", "minimize"],  # maximize accuracy, minimize time
-        sampler=optuna.samplers.NSGAIISampler(seed=42)
-    )
+for n_trials in trial_counts:
+    print(f"\n🔬 Testing with {n_trials} trials:")
     
-    # Create custom searcher
-    config_space = {
-        "random_forest": {
-            "n_estimators": {"type": "int", "bounds": [50, 200]},
-            "max_depth": {"type": "int", "bounds": [3, 10]}
-        },
-        "logistic_regression": {
-            "C": {"type": "float", "bounds": [0.1, 10.0]},
-            "max_iter": {"type": "int", "bounds": [100, 1000]}
+    try:
+        automl = MLTeammate(
+            learners=["random_forest", "gradient_boosting"],
+            task="classification",
+            searcher_type="random",
+            n_trials=n_trials,
+            cv_folds=3,
+            random_state=42
+        )
+        
+        automl.fit(X_train, y_train)
+        
+        # Test the model
+        y_pred = automl.predict(X_test)
+        test_accuracy = accuracy_score(y_test, y_pred)
+        
+        trial_results[n_trials] = {
+            "best_cv_score": automl.best_score,
+            "test_accuracy": test_accuracy,
+            "best_learner": automl.best_config.get('learner_name', 'unknown')
         }
-    }
-    
-    multi_searcher = OptunaSearcher(config_space, study=study)
-    
-    # Use with SimpleAutoML
-    automl = SimpleAutoML(
-        learners=["random_forest", "logistic_regression"],
-        task="classification",
-        n_trials=5,
-        cv=3
-    )
-    
-    # Override searcher
-    automl.controller.searcher = multi_searcher
-    automl.quick_classify(X_train, y_train)
-    
-    print("✅ Multi-objective optimization completed!")
-    
-except Exception as e:
-    print(f"❌ Multi-objective failed: {e}")
+        
+        print(f"   ✅ Best CV Score: {automl.best_score:.4f}")
+        print(f"   🎯 Test Accuracy: {test_accuracy:.4f}")
+        print(f"   🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
+        
+    except Exception as e:
+        print(f"   ❌ Failed: {e}")
+        trial_results[n_trials] = {"error": str(e)}
+
+# Show trial count impact
+print(f"\n📊 Trial Count Impact:")
+print(f"{'Trials':<8} {'CV Score':<10} {'Test Score':<10} {'Best Learner':<15}")
+print("-" * 50)
+for trials, result in trial_results.items():
+    if "error" not in result:
+        print(f"{trials:<8} {result['best_cv_score']:<10.4f} {result['test_accuracy']:<10.4f} {result['best_learner']:<15}")
+    else:
+        print(f"{trials:<8} {'Failed':<10} {'N/A':<10} {'N/A':<15}")
 
 # ============================================================================
-# STEP 4: Custom Optimization Objectives (No Functions!)
+# STEP 4: Cross-Validation Strategy Comparison
 # ============================================================================
 
-print("\n⚡ STEP 4: Custom Optimization Objectives")
+print("\n⚡ STEP 4: Cross-Validation Strategy Comparison")
 print("=" * 50)
 
 # Generate data
@@ -193,80 +186,57 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Method 1: Using SimpleAutoML with custom objective
-print("\n🔬 Method 1: Custom objective with SimpleAutoML")
+# Test different CV strategies
+cv_strategies = [2, 3, 5, None]  # None means no CV (train/test split)
+cv_results = {}
 
-# Define custom objective function
-def custom_balanced_accuracy(y_true, y_pred):
-    """Custom balanced accuracy with class balance penalty."""
-    from sklearn.metrics import balanced_accuracy_score
-    from collections import Counter
+for cv_folds in cv_strategies:
+    cv_name = f"{cv_folds}-fold CV" if cv_folds else "Train/Test Split"
+    print(f"\n🔬 Testing {cv_name}:")
     
-    # Calculate balanced accuracy
-    bal_acc = balanced_accuracy_score(y_true, y_pred)
-    
-    # Add penalty for class imbalance
-    class_counts = Counter(y_true)
-    imbalance_penalty = 1 - (min(class_counts.values()) / max(class_counts.values()))
-    
-    return bal_acc - 0.1 * imbalance_penalty
-
-# Use SimpleAutoML with custom scoring
-automl = SimpleAutoML(
-    learners=["random_forest", "logistic_regression"],
-    task="classification",
-    n_trials=5,
-    cv=3
-)
-
-# Configure with custom objective
-automl.with_advanced_search(
-    searcher_type="optuna",
-    sampler="TPE",
-    custom_scorer=custom_balanced_accuracy
-).quick_classify(X_train, y_train)
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-
-# Method 2: Direct custom objective
-print("\n🔬 Method 2: Direct custom objective")
-try:
-    # Create custom study with custom objective
-    def objective(trial):
-        # Suggest hyperparameters
-        learner_name = trial.suggest_categorical("learner_name", ["random_forest", "logistic_regression"])
+    try:
+        automl = MLTeammate(
+            learners=["random_forest", "logistic_regression"],
+            task="classification",
+            searcher_type="random",
+            n_trials=6,
+            cv_folds=cv_folds,
+            random_state=42
+        )
         
-        if learner_name == "random_forest":
-            n_estimators = trial.suggest_int("n_estimators", 50, 200)
-            max_depth = trial.suggest_int("max_depth", 3, 10)
-            model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
-        else:
-            C = trial.suggest_float("C", 0.1, 10.0)
-            max_iter = trial.suggest_int("max_iter", 100, 1000)
-            model = LogisticRegression(C=C, max_iter=max_iter, random_state=42)
+        automl.fit(X_train, y_train)
         
-        # Evaluate with custom scoring
-        scores = cross_val_score(model, X_train, y_train, cv=3, scoring=make_scorer(custom_balanced_accuracy))
-        return scores.mean()
-    
-    study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=42))
-    study.optimize(objective, n_trials=5)
-    
-    print(f"✅ Custom objective optimization completed!")
-    print(f"🏆 Best custom score: {study.best_value:.4f}")
-    print(f"⚙️ Best params: {study.best_params}")
-    
-except Exception as e:
-    print(f"❌ Custom objective failed: {e}")
+        # Test the model
+        y_pred = automl.predict(X_test)
+        test_accuracy = accuracy_score(y_test, y_pred)
+        
+        cv_results[cv_name] = {
+            "best_score": automl.best_score,
+            "test_accuracy": test_accuracy,
+            "best_learner": automl.best_config.get('learner_name', 'unknown')
+        }
+        
+        print(f"   ✅ Best Score: {automl.best_score:.4f}")
+        print(f"   🎯 Test Accuracy: {test_accuracy:.4f}")
+        print(f"   🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
+        
+    except Exception as e:
+        print(f"   ❌ Failed: {e}")
+        cv_results[cv_name] = {"error": str(e)}
+
+# Show CV strategy impact
+print(f"\n📊 Cross-Validation Strategy Impact:")
+for strategy, result in cv_results.items():
+    if "error" not in result:
+        print(f"   {strategy}: {result['test_accuracy']:.4f} test accuracy, best: {result['best_learner']}")
+    else:
+        print(f"   {strategy}: Failed - {result['error']}")
 
 # ============================================================================
-# STEP 5: Regression with Optuna (No Functions!)
+# STEP 5: Regression Search Comparison
 # ============================================================================
 
-print("\n📈 STEP 5: Regression with Optuna")
+print("\n📈 STEP 5: Regression Search Comparison")
 print("=" * 50)
 
 # Generate regression data
@@ -275,57 +245,55 @@ X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(X_reg, y_reg
 
 print(f"📊 Dataset shape: {X_reg.shape}")
 
-# Method 1: SimpleAutoML for regression
-print("\n🔬 Method 1: SimpleAutoML for regression")
-automl_reg = SimpleAutoML(
-    learners=["random_forest_regressor", "linear_regression", "ridge"],
-    task="regression",
-    n_trials=5,
-    cv=3
-)
+# Test regression with different search algorithms
+reg_results = {}
 
-automl_reg.with_advanced_search(searcher_type="optuna", sampler="TPE").quick_regress(X_train_reg, y_train_reg)
-
-# Test the model
-y_pred_reg = automl_reg.predict(X_test_reg)
-test_r2 = r2_score(y_test_reg, y_pred_reg)
-print(f"🎯 Test R² Score: {test_r2:.4f}")
-
-# Method 2: Direct regression optimization
-print("\n🔬 Method 2: Direct regression optimization")
-try:
-    def regression_objective(trial):
-        # Suggest hyperparameters for Random Forest Regressor
-        n_estimators = trial.suggest_int("n_estimators", 50, 200)
-        max_depth = trial.suggest_int("max_depth", 3, 15)
-        min_samples_split = trial.suggest_int("min_samples_split", 2, 10)
-        
-        model = RandomForestRegressor(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            min_samples_split=min_samples_split,
+for searcher_type in ["random", "flaml"]:
+    print(f"\n🔬 Testing {searcher_type} search for regression:")
+    
+    try:
+        automl_reg = MLTeammate(
+            learners=["random_forest_regressor", "linear_regression", "ridge"],
+            task="regression",
+            searcher_type=searcher_type,
+            n_trials=6,
+            cv_folds=3,
             random_state=42
         )
         
-        # Evaluate with R² scoring
-        scores = cross_val_score(model, X_train_reg, y_train_reg, cv=3, scoring='r2')
-        return scores.mean()
-    
-    study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=42))
-    study.optimize(regression_objective, n_trials=5)
-    
-    print(f"✅ Regression optimization completed!")
-    print(f"🏆 Best R² score: {study.best_value:.4f}")
-    print(f"⚙️ Best params: {study.best_params}")
-    
-except Exception as e:
-    print(f"❌ Regression optimization failed: {e}")
+        automl_reg.fit(X_train_reg, y_train_reg)
+        
+        # Test the model
+        y_pred_reg = automl_reg.predict(X_test_reg)
+        test_r2 = r2_score(y_test_reg, y_pred_reg)
+        
+        reg_results[searcher_type] = {
+            "best_score": automl_reg.best_score,
+            "test_r2": test_r2,
+            "best_learner": automl_reg.best_config.get('learner_name', 'unknown')
+        }
+        
+        print(f"   ✅ Best CV Score: {automl_reg.best_score:.4f}")
+        print(f"   🎯 Test R² Score: {test_r2:.4f}")
+        print(f"   🏆 Best Learner: {automl_reg.best_config.get('learner_name', 'unknown')}")
+        
+    except Exception as e:
+        print(f"   ❌ Failed: {e}")
+        reg_results[searcher_type] = {"error": str(e)}
+
+# Compare regression results
+print(f"\n📊 Regression Search Comparison:")
+for searcher, result in reg_results.items():
+    if "error" not in result:
+        print(f"   {searcher}: {result['test_r2']:.4f} R² score, best: {result['best_learner']}")
+    else:
+        print(f"   {searcher}: Failed - {result['error']}")
 
 # ============================================================================
-# STEP 6: Advanced Search Strategies (No Functions!)
+# STEP 6: MLflow Integration with Search
 # ============================================================================
 
-print("\n🚀 STEP 6: Advanced Search Strategies")
+print("\n🚀 STEP 6: MLflow Integration with Search")
 print("=" * 50)
 
 # Generate data
@@ -334,128 +302,81 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Strategy 1: Pruning with SimpleAutoML
-print("\n🔬 Strategy 1: Pruning with SimpleAutoML")
-automl = SimpleAutoML(
-    learners=["random_forest", "logistic_regression"],
-    task="classification",
-    n_trials=8,
-    cv=3
-)
+# Test search with MLflow tracking
+print("\n🔬 Search with MLflow tracking:")
 
-automl.with_advanced_search(
-    searcher_type="optuna",
-    sampler="TPE",
-    pruner="MedianPruner"
-).quick_classify(X_train, y_train)
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-
-# Strategy 2: Early stopping
-print("\n🔬 Strategy 2: Early stopping")
-automl = SimpleAutoML(
-    learners=["random_forest", "logistic_regression"],
-    task="classification",
-    n_trials=10,
-    cv=3
-)
-
-automl.with_advanced_search(
-    searcher_type="optuna",
-    sampler="TPE",
-    early_stopping=True,
-    patience=3
-).quick_classify(X_train, y_train)
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+try:
+    automl = MLTeammate(
+        learners=["random_forest", "gradient_boosting"],
+        task="classification",
+        searcher_type="random",
+        n_trials=6,
+        cv_folds=3,
+        enable_mlflow=True,  # Enable MLflow tracking
+        random_state=42
+    )
+    
+    automl.fit(X_train, y_train)
+    
+    # Test the model
+    y_pred = automl.predict(X_test)
+    test_accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"   ✅ Best CV Score: {automl.best_score:.4f}")
+    print(f"   🎯 Test Accuracy: {test_accuracy:.4f}")
+    print(f"   🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
+    print(f"   📊 MLflow tracking enabled - all trials logged")
+    
+    # Show summary
+    print(f"\n📋 MLflow Experiment Summary:")
+    summary = automl.summary()
+    for key, value in summary.items():
+        print(f"      {key}: {value}")
+        
+except Exception as e:
+    print(f"   ❌ MLflow integration failed: {e}")
 
 # ============================================================================
-# STEP 7: Method Chaining with Optuna (No Functions!)
+# STEP 7: Comprehensive Search Comparison
 # ============================================================================
 
-print("\n🔗 STEP 7: Method Chaining with Optuna")
+print("\n📊 STEP 7: Comprehensive Search Comparison")
 print("=" * 50)
 
-# Generate data
+# Generate final test data
 X, y = make_classification(n_samples=300, n_features=8, n_informative=4, random_state=42)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Chain multiple Optuna configurations
-print("\n🔬 Method chaining with Optuna:")
-
-# Example 1: TPE + Pruning + MLflow
-print("\n🔬 Example 1: TPE + Pruning + MLflow")
-automl = SimpleAutoML()
-automl.with_advanced_search(
-    searcher_type="optuna",
-    sampler="TPE",
-    pruner="MedianPruner"
-).with_mlflow(experiment_name="optuna_advanced").quick_classify(X_train, y_train)
-
-# Example 2: NSGAII + Multi-objective + Custom scoring
-print("\n🔬 Example 2: NSGAII + Multi-objective + Custom scoring")
-automl = SimpleAutoML()
-automl.with_advanced_search(
-    searcher_type="optuna",
-    sampler="NSGAII",
-    objectives=["accuracy", "speed"],
-    custom_scorer=custom_balanced_accuracy
-).quick_classify(X_train, y_train)
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-
-# ============================================================================
-# STEP 8: Performance Comparison (No Functions!)
-# ============================================================================
-
-print("\n📊 STEP 8: Performance Comparison")
-print("=" * 50)
-
-# Generate data
-X, y = make_classification(n_samples=250, n_features=6, n_informative=3, random_state=42)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-print(f"📊 Dataset shape: {X.shape}")
-
-# Compare different Optuna configurations
+# Test comprehensive configurations
 configurations = [
-    ("TPE Basic", {"sampler": "TPE"}),
-    ("TPE + Pruning", {"sampler": "TPE", "pruner": "MedianPruner"}),
-    ("NSGAII", {"sampler": "NSGAII"}),
-    ("Random", {"sampler": "Random"}),
-    ("CmaEs", {"sampler": "CmaEs"})
+    ("Random Search (Basic)", {"searcher_type": "random", "n_trials": 5}),
+    ("Random Search (Extended)", {"searcher_type": "random", "n_trials": 10}),
+    ("FLAML Search", {"searcher_type": "flaml", "n_trials": 5}),
+    ("Random + MLflow", {"searcher_type": "random", "n_trials": 5, "enable_mlflow": True}),
 ]
 
-results = {}
+final_results = {}
 
 for name, config in configurations:
     print(f"\n🔬 Testing {name}:")
     
     try:
-        automl = SimpleAutoML(
-            learners=["random_forest", "logistic_regression"],
+        automl = MLTeammate(
+            learners=["random_forest", "logistic_regression", "gradient_boosting"],
             task="classification",
-            n_trials=3,
-            cv=3
+            cv_folds=3,
+            random_state=42,
+            **config
         )
         
-        automl.with_advanced_search(searcher_type="optuna", **config).quick_classify(X_train, y_train)
+        automl.fit(X_train, y_train)
         
         y_pred = automl.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
         
-        results[name] = {
+        final_results[name] = {
             "accuracy": accuracy,
             "best_score": automl.best_score,
             "best_learner": automl.best_config.get('learner_name', 'unknown')
@@ -467,13 +388,13 @@ for name, config in configurations:
         
     except Exception as e:
         print(f"   ❌ Failed: {e}")
-        results[name] = {"error": str(e)}
+        final_results[name] = {"error": str(e)}
 
-# Summary
-print("\n📋 Optuna Configuration Comparison:")
-for name, result in results.items():
+# Final comparison
+print("\n📋 Final Search Configuration Comparison:")
+for name, result in final_results.items():
     if "error" not in result:
-        print(f"   {name}: {result['accuracy']:.4f} accuracy, best: {result['best_learner']}")
+        print(f"   {name}: {result['accuracy']:.4f} accuracy, CV: {result['best_score']:.4f}, best: {result['best_learner']}")
     else:
         print(f"   {name}: Failed - {result['error']}")
 
@@ -482,15 +403,20 @@ for name, result in results.items():
 # ============================================================================
 
 print("\n" + "=" * 60)
-print("🎉 OPTUNA SEARCH TUTORIAL COMPLETED!")
+print("🎉 SEARCH OPTIMIZATION TUTORIAL COMPLETED!")
 print("=" * 60)
-print("✅ You've explored advanced Optuna features with ZERO function definitions!")
-print("✅ Method chaining, custom objectives, and multi-objective optimization!")
-print("✅ Pandas-style interface makes advanced optimization simple!")
+print("✅ You've explored different search algorithms!")
+print("✅ Compared random search vs FLAML search!")
+print("✅ Tested different trial counts and CV strategies!")
+print("✅ Integrated MLflow experiment tracking!")
 print("\n💡 Key Takeaways:")
-print("   • No function definitions needed")
-print("   • Method chaining for complex configurations")
-print("   • Custom objectives and multi-objective optimization")
-print("   • Auto-execution and smart defaults")
-print("   • Advanced optimization techniques made simple")
-print("\n🚀 Ready to use advanced Optuna features like pandas!")
+print("   • Different search algorithms have different strengths")
+print("   • More trials generally lead to better results")
+print("   • Cross-validation provides more robust estimates")
+print("   • MLflow integration enables experiment tracking")
+print("   • Random search is simple and effective")
+print("   • FLAML search can be more efficient for larger spaces")
+print("\n🚀 Ready to optimize your AutoML searches!")
+
+if __name__ == "__main__":
+    pass

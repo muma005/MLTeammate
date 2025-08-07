@@ -1,0 +1,51 @@
+[
+  {
+    "learner_name": "random_forest",
+    "n_estimators": 56,
+    "max_depth": 11,
+    "min_samples_split": 5,
+    "min_samples_leaf": 4,
+    "max_features": "sqrt",
+    "criterion": "gini",
+    "random_state": 42
+  },
+  {
+    "learner_name": "random_forest",
+    "n_estimators": 201,
+    "max_depth": 16,
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "max_features": "sqrt",
+    "criterion": "gini",
+    "random_state": 42
+  },
+  {
+    "learner_name": "random_forest",
+    "n_estimators": 179,
+    "max_depth": 3,
+    "min_samples_split": 10,
+    "min_samples_leaf": 4,
+    "max_features": null,
+    "criterion": "entropy",
+    "random_state": 42
+  },
+  {
+    "learner_name": "random_forest",
+    "n_estimators": 164,
+    "max_depth": 11,
+    "min_samples_split": 2,
+    "min_samples_leaf": 3,
+    "max_features": null,
+    "criterion": "entropy",
+    "random_state": 42
+  },
+  {
+    "learner_name": "logistic_regression",
+    "C": 0.02451075609557497,
+    "penalty": "l2",
+    "solver": "lbfgs",
+    "max_iter": 309,
+    "class_weight": null,
+    "random_state": 42
+  }
+]

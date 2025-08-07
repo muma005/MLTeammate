@@ -1,40 +1,65 @@
-# 02_with_cross_validation.py
-
-# tutorials/02_with_cross_validation.py
-
 """
-02_with_cross_validation.py
----------------------------
-Show how to run MLTeammate with k-fold cross‑validation (cv > 1).
+MLTeammate Tutorial 2: Cross-Validation
+
+This tutorial demonstrates how to use MLTeammate with k-fold cross-validation.
+Uses the MLTeammate API interface with cv_folds parameter.
 """
 
-# tutorials/02_with_cross_validation.py
-from ml_teammate.automl.controller import AutoMLController
-from ml_teammate.search.optuna_search import OptunaSearcher
-from ml_teammate.learners.xgboost_learner import XGBoostLearner  # Direct import
+import numpy as np
 from sklearn.datasets import make_classification
+from sklearn.metrics import accuracy_score
 
-# Manually define config space matching your frozen OptunaSearcher format
+# Use the MLTeammate API interface
+from ml_teammate.interface.api import MLTeammate
 
-XGBOOST_CONFIG = {
-    "n_estimators": {"type": "int", "bounds": [50, 200]},
-    "max_depth": {"type": "int", "bounds": [3, 10]},
-    "learning_rate": {"type": "float", "bounds": [0.01, 0.3]}
-}
+print("🚀 MLTeammate Tutorial 2: Cross-Validation")
+print("=" * 50)
 
-# Data generation
-X, y = make_classification(n_samples=1000, n_features=20, random_state=42)
-
-# Initialize controller with current frozen components
-controller = AutoMLController(
-    learners={"xgboost": XGBoostLearner},  # Using class directly
-    searcher=OptunaSearcher({"xgboost": XGBOOST_CONFIG}),
-    config_space={"xgboost": XGBOOST_CONFIG},
-    task="classification",
-    n_trials=10,
-    cv=5  # Using existing CV parameter
+# 1. Create a larger synthetic classification dataset
+print("📊 Creating synthetic dataset...")
+X, y = make_classification(
+    n_samples=1000, 
+    n_features=20, 
+    n_informative=15,
+    n_redundant=3,
+    random_state=42
 )
 
-# Execute
-controller.fit(X, y)
-print(f"Best model score: {controller.best_score:.4f}")
+print(f"   Dataset shape: {X.shape}")
+print(f"   Classes: {len(np.unique(y))}")
+
+# 2. Create AutoML instance with cross-validation
+print("\n🤖 Setting up AutoML with 5-fold CV...")
+automl = MLTeammate(
+    learners=["random_forest", "logistic_regression"],
+    task="classification",
+    searcher_type="random",
+    n_trials=8,
+    cv_folds=5,  # Enable 5-fold cross-validation
+    random_state=42
+)
+
+# 3. Fit the model with cross-validation
+print("\n🏋️ Training AutoML models with CV...")
+automl.fit(X, y)
+
+# 4. Get results
+print(f"\n📈 Cross-validation completed!")
+print(f"📈 Best CV Score: {automl.best_score:.4f}")
+print(f"🏆 Best learner configuration found")
+
+# 5. Show summary
+print("\n📋 Results Summary:")
+summary = automl.summary()
+for key, value in summary.items():
+    print(f"   {key}: {value}")
+
+print(f"\n🔄 Cross-validation benefits:")
+print(f"   ✓ More robust performance estimates")
+print(f"   ✓ Better generalization assessment") 
+print(f"   ✓ Reduced overfitting risk")
+print(f"   ✓ Uses all data for training and validation")
+
+print("\n🎉 Tutorial 2 completed successfully!")
+print("💡 Cross-validation gives more reliable performance estimates!")
+print("💡 Next: Try tutorial 03 for MLflow integration examples")

@@ -2,43 +2,54 @@
 """
 04_add_custom_learner.py
 ------------------------
-Demonstrate how to add custom learners to MLTeammate with ZERO function definitions.
+Demonstrate how to use MLTeammate with different learner combinations.
 
 This tutorial shows:
-1. How to use pre-built custom learners (no def functions needed!)
-2. How to create custom learners using backend methods
-3. How to use custom learners with the pandas-style API
-4. How the backend handles all the complexity
+1. How to use available learners with different configurations
+2. How to compare different learner combinations
+3. How to use the MLTeammate API for custom experiments
+4. How to get comprehensive results
 
-Perfect for users who want to extend MLTeammate with their own models!
+Perfect for users who want to explore different learner options!
 """
 
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 
-# Import the pandas-style API
-from ml_teammate.interface import SimpleAutoML
+# Import the MLTeammate API
+from ml_teammate.interface.api import MLTeammate
 
 # ============================================================================
-# STEP 1: Explore Available Learners (No Functions!)
+# STEP 1: Explore Available Learners
 # ============================================================================
 
-print("🔍 STEP 1: Explore Available Learners")
+print("🔍 STEP 1: Available Learners in MLTeammate")
 print("=" * 50)
 
-# Just call the method - no function needed!
-automl = SimpleAutoML()
-automl.explore_learners()  # Auto-executes and prints results
+# Available learners for classification
+available_learners = {
+    "classification": ["random_forest", "logistic_regression", "svm", "gradient_boosting"],
+    "regression": ["linear_regression", "ridge", "random_forest_regressor", "gradient_boosting_regressor"]
+}
+
+print("📊 Classification Learners:")
+for i, learner in enumerate(available_learners["classification"], 1):
+    print(f"   {i:2d}. {learner}")
+
+print("\n📈 Regression Learners:")
+for i, learner in enumerate(available_learners["regression"], 1):
+    print(f"   {i:2d}. {learner}")
+
+print(f"\n📋 Total Available Learners: {len(available_learners['classification']) + len(available_learners['regression'])}")
+print("💡 You can use any of these by simply specifying their names as strings!")
 
 # ============================================================================
-# STEP 2: Use Pre-Built Custom Learners (No Functions!)
+# STEP 2: Basic Learner Comparison
 # ============================================================================
 
-print("\n🎯 STEP 2: Use Pre-Built Custom Learners")
+print("\n🎯 STEP 2: Basic Learner Comparison")
 print("=" * 50)
 
 # Generate sample data
@@ -57,36 +68,47 @@ X_train, X_test, y_train, y_test = train_test_split(
 print(f"📊 Dataset shape: {X.shape}")
 print(f"🎯 Classes: {np.unique(y)}")
 
-# Method 1: Use pre-built custom learners (no def functions needed!)
-print("\n🔬 Method 1: Pre-built custom learners")
-automl = SimpleAutoML(
-    learners=["custom_rf", "custom_lr", "random_forest"],  # Mix of custom and built-in
+# Method 1: Use tree-based learners
+print("\n🔬 Method 1: Tree-based learners")
+automl = MLTeammate(
+    learners=["random_forest", "gradient_boosting"],  # Available tree-based learners
     task="classification",
-    n_trials=10,
-    cv=3
+    n_trials=8,
+    cv_folds=3,
+    random_state=42
 )
-automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+automl.fit(X_train, y_train)
 
 # Test the model
 y_pred = automl.predict(X_test)
 test_accuracy = accuracy_score(y_test, y_pred)
+print(f"📈 Best CV Score: {automl.best_score:.4f}")
 print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+print(f"🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
 
-# Method 2: Use only pre-built custom learners
-print("\n🔬 Method 2: Only pre-built custom learners")
-automl = SimpleAutoML(learners=["custom_rf", "custom_lr"], n_trials=5)
-automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+# Method 2: Use linear learners for comparison
+print("\n🔬 Method 2: Linear learners")
+automl2 = MLTeammate(
+    learners=["logistic_regression", "svm"], 
+    task="classification",
+    n_trials=5,
+    cv_folds=3,
+    random_state=42
+)
+automl2.fit(X_train, y_train)
 
 # Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+y_pred2 = automl2.predict(X_test)
+test_accuracy2 = accuracy_score(y_test, y_pred2)
+print(f"📈 Best CV Score: {automl2.best_score:.4f}")
+print(f"🎯 Test Accuracy: {test_accuracy2:.4f}")
+print(f"🏆 Best Learner: {automl2.best_config.get('learner_name', 'unknown')}")
 
 # ============================================================================
-# STEP 3: Use Pre-Built Ensemble Learner (No Functions!)
+# STEP 3: Compare All Available Learners
 # ============================================================================
 
-print("\n⚡ STEP 3: Use Pre-Built Ensemble Learner")
+print("\n⚡ STEP 3: Compare All Available Learners")
 print("=" * 50)
 
 # Generate data
@@ -95,21 +117,35 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Use the pre-built ensemble learner
-print("\n🔬 Using the pre-built ensemble learner:")
-automl = SimpleAutoML(learners="ensemble", n_trials=5)
-automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+# Use all available learners
+print("\n🔬 Using all available classification learners:")
+automl = MLTeammate(
+    learners=["random_forest", "gradient_boosting", "logistic_regression", "svm"], 
+    task="classification",
+    n_trials=8,
+    cv_folds=3,
+    random_state=42
+)
+automl.fit(X_train, y_train)
 
 # Test the model
 y_pred = automl.predict(X_test)
 test_accuracy = accuracy_score(y_test, y_pred)
+print(f"📈 Best CV Score: {automl.best_score:.4f}")
 print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+print(f"🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
+
+# Show summary
+print("\n📋 Results Summary:")
+summary = automl.summary()
+for key, value in summary.items():
+    print(f"   {key}: {value}")
 
 # ============================================================================
-# STEP 4: Create Custom Learners with Backend Methods (No Functions!)
+# STEP 4: MLflow Integration with Learner Comparison
 # ============================================================================
 
-print("\n🔧 STEP 4: Create Custom Learners with Backend Methods")
+print("\n🔧 STEP 4: MLflow Integration with Learner Comparison")
 print("=" * 50)
 
 # Generate data
@@ -118,48 +154,30 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Method 1: Add custom learner using backend method
-print("\n🔬 Method 1: Add custom learner using backend method")
-automl = SimpleAutoML()
-
-# Add a custom Random Forest with specific parameters (no def function!)
-automl.add_custom_learner(
-    name="my_rf",
-    model_class=RandomForestClassifier,
-    config_space={
-        "n_estimators": {"type": "int", "bounds": [100, 500]},
-        "max_depth": {"type": "int", "bounds": [5, 20]},
-        "min_samples_split": {"type": "int", "bounds": [2, 15]}
-    },
-    random_state=42,
-    criterion="gini"
+# Compare with MLflow tracking enabled
+print("\n🔬 Experiment with MLflow tracking:")
+automl = MLTeammate(
+    learners=["random_forest", "gradient_boosting"],
+    task="classification",
+    n_trials=6,
+    cv_folds=3,
+    enable_mlflow=True,  # Enable MLflow tracking
+    random_state=42
 )
-
-# Add a custom Logistic Regression
-automl.add_custom_learner(
-    name="my_lr",
-    model_class=LogisticRegression,
-    config_space={
-        "C": {"type": "float", "bounds": [0.01, 100.0]},
-        "max_iter": {"type": "int", "bounds": [500, 3000]}
-    },
-    random_state=42,
-    solver="liblinear"
-)
-
-# Now use the custom learners
-automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
+automl.fit(X_train, y_train)
 
 # Test the model
 y_pred = automl.predict(X_test)
 test_accuracy = accuracy_score(y_test, y_pred)
+print(f"📈 Best CV Score: {automl.best_score:.4f}")
 print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+print(f"🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
 
 # ============================================================================
-# STEP 5: Create Ensemble Learners with Backend Methods (No Functions!)
+# STEP 5: Learner Performance Comparison
 # ============================================================================
 
-print("\n🔗 STEP 5: Create Ensemble Learners with Backend Methods")
+print("\n🔗 STEP 5: Learner Performance Comparison")
 print("=" * 50)
 
 # Generate data
@@ -168,82 +186,12 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Method 1: Add ensemble learner using backend method
-print("\n🔬 Method 1: Add ensemble learner using backend method")
-automl = SimpleAutoML()
-
-# Add an ensemble learner (no def function!)
-automl.add_ensemble_learner(
-    name="my_ensemble",
-    learners=["random_forest", "logistic_regression"],
-    config_space={
-        "random_forest_n_estimators": {"type": "int", "bounds": [50, 200]},
-        "random_forest_max_depth": {"type": "int", "bounds": [3, 15]},
-        "logistic_regression_C": {"type": "float", "bounds": [0.1, 10.0]},
-        "logistic_regression_max_iter": {"type": "int", "bounds": [100, 1000]}
-    }
-)
-
-# Use the custom ensemble learner
-automl.quick_classify(X_train, y_train)  # Auto-executes and prints results!
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-
-# ============================================================================
-# STEP 6: Method Chaining with Custom Learners (No Functions!)
-# ============================================================================
-
-print("\n🔗 STEP 6: Method Chaining with Custom Learners")
-print("=" * 50)
-
-# Generate data
-X, y = make_classification(n_samples=400, n_features=8, n_informative=4, random_state=42)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-print(f"📊 Dataset shape: {X.shape}")
-
-# Chain multiple methods with custom learners
-print("\n🔬 Method chaining with custom learners:")
-automl = SimpleAutoML()
-
-# Add custom learner and configure everything in one chain
-automl.add_custom_learner(
-    name="chained_rf",
-    model_class=RandomForestClassifier,
-    config_space={
-        "n_estimators": {"type": "int", "bounds": [50, 150]},
-        "max_depth": {"type": "int", "bounds": [3, 10]}
-    },
-    random_state=42
-).with_mlflow(experiment_name="custom_learners").with_flaml(time_budget=20).quick_classify(X_train, y_train)
-
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
-
-# ============================================================================
-# STEP 7: Compare Pre-Built vs Custom Learners (No Functions!)
-# ============================================================================
-
-print("\n📊 STEP 7: Compare Pre-Built vs Custom Learners")
-print("=" * 50)
-
-# Generate data
-X, y = make_classification(n_samples=350, n_features=6, n_informative=3, random_state=42)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-print(f"📊 Dataset shape: {X.shape}")
-
 # Compare different learner combinations
 learner_combinations = [
-    ("Built-in only", ["random_forest", "logistic_regression"]),
-    ("Pre-built custom", ["custom_rf", "custom_lr"]),
-    ("Pre-built ensemble", ["ensemble"]),
-    ("Mixed", ["random_forest", "custom_rf", "ensemble"])
+    ("Tree-based models", ["random_forest", "gradient_boosting"]),
+    ("Linear models", ["logistic_regression", "svm"]),
+    ("Fast models", ["logistic_regression", "random_forest"]),
+    ("Robust models", ["gradient_boosting", "svm"])
 ]
 
 results = {}
@@ -252,8 +200,14 @@ for name, learners in learner_combinations:
     print(f"\n🔬 Testing {name}:")
     
     try:
-        automl = SimpleAutoML(learners=learners, n_trials=3)
-        automl.quick_classify(X_train, y_train)
+        automl = MLTeammate(
+            learners=learners, 
+            task="classification",
+            n_trials=4,
+            cv_folds=3,
+            random_state=42
+        )
+        automl.fit(X_train, y_train)
         
         y_pred = automl.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
@@ -281,66 +235,92 @@ for name, result in results.items():
         print(f"   {name}: Failed - {result['error']}")
 
 # ============================================================================
-# STEP 8: Smart Defaults with Custom Learners (No Functions!)
+# STEP 6: Cross-Validation Comparison
 # ============================================================================
 
-print("\n🧠 STEP 8: Smart Defaults with Custom Learners")
+print("\n🧠 STEP 6: Cross-Validation Comparison")
 print("=" * 50)
 
 # Generate data
-X, y = make_classification(n_samples=300, n_features=5, n_informative=3, random_state=42)
+X, y = make_classification(n_samples=400, n_features=8, n_informative=4, random_state=42)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Let SimpleAutoML auto-configure with custom learners
-print("\n🔬 Auto-configured experiment with custom learners:")
-automl = SimpleAutoML(learners=["custom_rf", "custom_lr"])  # Just specify learners!
-automl.quick_classify(X_train, y_train)  # Auto-detects task, configures trials, CV, etc.
+# Compare different CV strategies
+cv_strategies = [2, 3, 5]
 
-# Test the model
-y_pred = automl.predict(X_test)
-test_accuracy = accuracy_score(y_test, y_pred)
-print(f"🎯 Test Accuracy: {test_accuracy:.4f}")
+for cv_folds in cv_strategies:
+    print(f"\n🔬 Testing {cv_folds}-fold cross-validation:")
+    
+    automl = MLTeammate(
+        learners=["random_forest", "logistic_regression"],
+        task="classification",
+        n_trials=4,
+        cv_folds=cv_folds,
+        random_state=42
+    )
+    automl.fit(X_train, y_train)
+    
+    y_pred = automl.predict(X_test)
+    test_accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"   📈 Best CV Score: {automl.best_score:.4f}")
+    print(f"   🎯 Test Accuracy: {test_accuracy:.4f}")
+    print(f"   🏆 Best Learner: {automl.best_config.get('learner_name', 'unknown')}")
 
 # ============================================================================
-# STEP 9: Results Summary with Custom Learners (No Functions!)
+# STEP 7: Final Results Summary
 # ============================================================================
 
-print("\n📋 STEP 9: Results Summary with Custom Learners")
+print("\n📋 STEP 7: Final Results Summary")
 print("=" * 50)
 
-# Generate data
-X, y = make_classification(n_samples=250, n_features=4, n_informative=2, random_state=42)
+# Generate data for final test
+X, y = make_classification(n_samples=300, n_features=6, n_informative=3, random_state=42)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 print(f"📊 Dataset shape: {X.shape}")
 
-# Run experiment with custom learners
-automl = SimpleAutoML(learners=["custom_rf", "custom_lr", "ensemble"], n_trials=2)
-automl.quick_classify(X_train, y_train)
+# Final comprehensive experiment
+automl = MLTeammate(
+    learners=["random_forest", "gradient_boosting", "logistic_regression"], 
+    task="classification",
+    n_trials=6,
+    cv_folds=3,
+    random_state=42
+)
+automl.fit(X_train, y_train)
 
 # Get comprehensive results summary
-print("\n📋 Results Summary:")
-summary = automl.get_results_summary()
+print("\n📋 Final Results Summary:")
+summary = automl.summary()
 for key, value in summary.items():
     print(f"   {key}: {value}")
+
+# Final test
+y_pred = automl.predict(X_test)
+final_accuracy = accuracy_score(y_test, y_pred)
+print(f"\n🎯 Final Test Accuracy: {final_accuracy:.4f}")
 
 # ============================================================================
 # FINAL SUMMARY
 # ============================================================================
 
 print("\n" + "=" * 60)
-print("🎉 CUSTOM LEARNER TUTORIAL COMPLETED!")
+print("🎉 LEARNER COMPARISON TUTORIAL COMPLETED!")
 print("=" * 60)
-print("✅ You've created and used custom learners with ZERO function definitions!")
-print("✅ Pre-built custom learners available out of the box!")
-print("✅ Backend methods for easy custom learner creation!")
-print("✅ Pandas-style interface works seamlessly with custom learners!")
+print("✅ You've explored different learner combinations!")
+print("✅ Compared tree-based vs linear models!")
+print("✅ Used cross-validation strategies!")
+print("✅ Integrated MLflow experiment tracking!")
 print("\n💡 Key Takeaways:")
-print("   • No def functions needed anywhere!")
-print("   • Pre-built custom learners ready to use")
-print("   • Backend methods for easy customization")
-print("   • Method chaining and auto-execution work perfectly")
-print("   • Easy to extend MLTeammate with your own models")
-print("\n🚀 Ready to create custom learners like a pro!")
+print("   • Different learners excel on different datasets")
+print("   • Tree-based models (Random Forest, Gradient Boosting) often perform well")
+print("   • Linear models (Logistic Regression, SVM) are fast and interpretable")
+print("   • Cross-validation provides more robust performance estimates")
+print("   • MLflow integration enables experiment tracking")
+print("\n🚀 Ready to choose the best learners for your data!")
+
+if __name__ == "__main__":
+    pass

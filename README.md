@@ -12,7 +12,7 @@ It integrates powerful tools like Optuna, XGBoost, LightGBM, and MLflow — allo
 
 - 🚀 **Simple API** - Use MLTeammate without writing custom code
 - 🔄 Cross-validation support (built-in)
-- 🧠 **20+ Pre-built learners** (Random Forest, SVM, XGBoost, LightGBM, etc.)
+- 🧠 **12 Core learners** (Random Forest, SVM, XGBoost, LightGBM, etc.)
 - 🧪 Hyperparameter tuning with Optuna
 - 🔬 MLflow experiment tracking (optional)
 - ⚙️ Easy to extend with custom learners & config spaces
@@ -20,14 +20,13 @@ It integrates powerful tools like Optuna, XGBoost, LightGBM, and MLflow — allo
 
 ## 📊 Available Learners
 
-### Classification
-- Random Forest, Logistic Regression, SVM, K-Nearest Neighbors
-- Decision Trees, Naive Bayes, Linear Discriminant Analysis
-- Gradient Boosting, Extra Trees, XGBoost, LightGBM
+### Classification (6)
+- Random Forest, Logistic Regression, SVM, Gradient Boosting
+- XGBoost, LightGBM
 
-### Regression  
-- Linear Regression, Ridge, Lasso, Random Forest Regressor
-- Gradient Boosting Regressor, SVR, K-Nearest Neighbors Regressor
+### Regression (6)  
+- Linear Regression, Ridge, Random Forest Regressor
+- Gradient Boosting Regressor, XGBoost, LightGBM
 
 **Just specify learner names as strings!** No custom classes needed.
 

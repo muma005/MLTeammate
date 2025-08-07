@@ -21,10 +21,12 @@ ml_teammate/experiments/mlflow_helper.py
 ml_teammate/interface/__init__.py
 ml_teammate/interface/api.py
 ml_teammate/interface/cli.py
+ml_teammate/interface/simple_api.py
 ml_teammate/learners/__init__.py
 ml_teammate/learners/custom.py
 ml_teammate/learners/h2o_learner.py
 ml_teammate/learners/lightgbm_learner.py
+ml_teammate/learners/registry.py
 ml_teammate/learners/xgboost_learner.py
 ml_teammate/search/# python programming practice.py
 ml_teammate/search/__init__.py
@@ -37,3 +39,11 @@ ml_teammate/utils/logger.py
 ml_teammate/utils/metrics.py
 ml_teammate/utils/schema.py
 ml_teammate/utils/timer.py
+tests/test_automl_controller.py
+tests/test_callbacks.py
+tests/test_error_handling.py
+tests/test_learner_registry.py
+tests/test_performance_benchmarks.py
+tests/test_search_components.py
+tests/test_simple_api.py
+tests/test_tutorials_integration.py
