@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml-teammate"
+version = "0.1.0"
+authors = [
+    {name = "muma005", email = "your.email@example.com"},
+]
+description = "An AutoML framework for machine learning automation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "scikit-learn>=1.0.0",
+    "pandas>=1.3.0",
+    "numpy>=1.21.0",
+    "matplotlib>=3.5.0",
+    "mlflow>=1.20.0",
+    "optuna>=3.0.0",
+    "flaml>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.0.0",
+    "black>=21.0.0",
+    "flake8>=3.9.0",
+]
+full = [
+    "xgboost>=1.5.0",
+    "lightgbm>=3.2.0",
+    "h2o>=3.36.0",
+]
+
+[project.scripts]
+mlteammate = "ml_teammate.interface.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/muma005/MLTeammate"
+Repository = "https://github.com/muma005/MLTeammate"
+Documentation = "https://github.com/muma005/MLTeammate/blob/main/README.md"
+"Bug Reports" = "https://github.com/muma005/MLTeammate/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ml_teammate*"]
+exclude = ["tests*"]

@@ -1,0 +1,2 @@
+[console_scripts]
+mlteammate = ml_teammate.interface.cli:main
